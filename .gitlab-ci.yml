@@ -1,6 +1,11 @@
 # GitLab CI/CD Pipeline for FerrisProof
 # Enhanced pipeline with comprehensive testing including property-based tests
 
+# Include GitLab security templates
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   CARGO_TERM_COLOR: always
@@ -15,6 +20,11 @@ variables:
   # Podman configuration for GitLab runners
   BUILDAH_FORMAT: docker
   BUILDAH_ISOLATION: chroot
+  # SAST configuration
+  SAST_EXCLUDED_PATHS: "target/, .cargo/, proptest-regressions/"
+  SAST_EXCLUDED_ANALYZERS: "bandit,brakeman,eslint,flawfinder,gosec,kubesec,nodejs-scan,phpcs-security-audit,pmd-apex,security-code-scan,semgrep,sobelow,spotbugs"
+  # Secret Detection configuration
+  SECRET_DETECTION_EXCLUDED_PATHS: "target/, .cargo/, proptest-regressions/, docs/"
 
 # Define stages
 stages:
@@ -243,7 +253,7 @@ coverage:
 
 # Test report generation
 test_report:
-  <<: *rust_job
+  image: rust:1.75-slim
   stage: property-test
   needs: 
     - test_unit
@@ -253,7 +263,17 @@ test_report:
     - property_test_plugins
   before_script:
     - apt-get update && apt-get install -y pkg-config libssl-dev
+    - rustup component add rustfmt clippy
+    - export PATH="$CARGO_HOME/bin:$PATH"
     - cargo install cargo-nextest
+  cache:
+    key: 
+      files:
+        - Cargo.lock
+    paths:
+      - .cargo/
+      - target/
+    policy: pull
   script:
     - echo "Generating comprehensive test report..."
     - cargo nextest run --all-features --workspace --reporter junit --output-file test-results.xml || true
@@ -262,10 +282,13 @@ test_report:
     - echo "Creating test summary..."
     - echo "# FerrisProof Test Summary" > test-summary.md
     - echo "## Test Execution Results" >> test-summary.md
-    - echo "- Unit tests: $(cargo test --lib --all-features -- --list 2>/dev/null | wc -l)" >> test-summary.md
-    - echo "- Integration tests: $(cargo test --tests --all-features -- --list 2>/dev/null | wc -l)" >> test-summary.md
-    - echo "- Property tests: $(wc -l < property-tests.txt)" >> test-summary.md
-    - echo "- Date: $(date)" >> test-summary.md
+    - cargo test --lib --all-features -- --list 2>/dev/null | wc -l > unit_count.tmp
+    - echo "- Unit tests:" $(cat unit_count.tmp) >> test-summary.md
+    - cargo test --tests --all-features -- --list 2>/dev/null | wc -l > integration_count.tmp
+    - echo "- Integration tests:" $(cat integration_count.tmp) >> test-summary.md
+    - wc -l < property-tests.txt > property_count.tmp
+    - echo "- Property tests:" $(cat property_count.tmp) >> test-summary.md
+    - echo "- Date:" $(date) >> test-summary.md
     - cat test-summary.md
   artifacts:
     when: always
@@ -280,6 +303,34 @@ test_report:
     - if: $CI_COMMIT_TAG
 
 # Security stage
+# SAST - Static Application Security Testing
+sast:
+  stage: security
+  variables:
+    SAST_EXCLUDED_PATHS: "target/, .cargo/, proptest-regressions/"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  artifacts:
+    reports:
+      sast: gl-sast-report.json
+    expire_in: 1 week
+
+# Secret Detection
+secret_detection:
+  stage: security
+  variables:
+    SECRET_DETECTION_EXCLUDED_PATHS: "target/, .cargo/, proptest-regressions/, docs/"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  artifacts:
+    reports:
+      secret_detection: gl-secret-detection-report.json
+    expire_in: 1 week
+
 security_audit:
   image: rust:1.75-slim
   stage: security
@@ -306,6 +357,43 @@ dependency_check:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
+# Security summary job
+security_summary:
+  image: alpine:latest
+  stage: security
+  needs:
+    - sast
+    - secret_detection
+    - security_audit
+    - dependency_check
+  before_script:
+    - apk add --no-cache jq
+  script:
+    - echo "# Security Scan Summary" > security-summary.md
+    - echo "## SAST Results" >> security-summary.md
+    - if [ -f gl-sast-report.json ]; then echo "- SAST scan completed" >> security-summary.md; else echo "- SAST scan not available" >> security-summary.md; fi
+    - if [ -f gl-sast-report.json ]; then jq -r '.vulnerabilities | length' gl-sast-report.json > sast_count.tmp; else echo "0" > sast_count.tmp; fi
+    - echo "- Found" $(cat sast_count.tmp) "vulnerabilities" >> security-summary.md
+    - echo "## Secret Detection Results" >> security-summary.md
+    - if [ -f gl-secret-detection-report.json ]; then echo "- Secret detection scan completed" >> security-summary.md; else echo "- Secret detection scan not available" >> security-summary.md; fi
+    - if [ -f gl-secret-detection-report.json ]; then jq -r '.vulnerabilities | length' gl-secret-detection-report.json > secret_count.tmp; else echo "0" > secret_count.tmp; fi
+    - echo "- Found" $(cat secret_count.tmp) "secrets" >> security-summary.md
+    - echo "## Dependency Audit" >> security-summary.md
+    - echo "- Cargo audit completed (see job logs for details)" >> security-summary.md
+    - echo "- Unused dependencies check completed (see job logs for details)" >> security-summary.md
+    - echo "## Scan Date:" $(date) >> security-summary.md
+    - cat security-summary.md
+  artifacts:
+    paths:
+      - security-summary.md
+      - gl-sast-report.json
+      - gl-secret-detection-report.json
+    expire_in: 1 week
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 # Build stage - Multi-platform builds
 .build_template: &build_template
   <<: *rust_job
@@ -318,10 +406,7 @@ dependency_check:
     - property_test_plugins
   script:
     - rustup target add $TARGET
-    - |
-      if [ "$TARGET" = "x86_64-unknown-linux-musl" ]; then
-        apt-get install -y musl-tools
-      fi
+    - if [ "$TARGET" = "x86_64-unknown-linux-musl" ]; then apt-get install -y musl-tools; fi
     - cargo build --release --target $TARGET --bin ferris-proof
     - strip target/$TARGET/release/ferris-proof || true
     - mkdir -p artifacts
@@ -371,26 +456,10 @@ container_build:
   before_script:
     - podman login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - |
-      # Build multi-arch image
-      podman build \
-        --platform linux/amd64,linux/arm64 \
-        --manifest $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA \
-        -f $DOCKERFILE \
-        .
+    - podman build --platform linux/amd64,linux/arm64 --manifest $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA -f $DOCKERFILE .
     - podman manifest push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-    - |
-      # Tag as latest for main branch
-      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest
-        podman push $CI_REGISTRY_IMAGE:latest
-      fi
-    - |
-      # Tag with version for tags
-      if [ -n "$CI_COMMIT_TAG" ]; then
-        podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-        podman push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-      fi
+    - if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:latest; podman push $CI_REGISTRY_IMAGE:latest; fi
+    - if [ -n "$CI_COMMIT_TAG" ]; then podman tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG; podman push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG; fi
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
@@ -398,7 +467,8 @@ container_build:
 container_test:
   image: quay.io/podman/stable:latest
   stage: container
-  needs: ["container_build"]
+  needs: 
+    - container_build
   script:
     - podman run --rm $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA --version
     - podman run --rm $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA --help
@@ -410,9 +480,10 @@ container_test:
 container_security:
   image: 
     name: aquasec/trivy:latest
-    entrypoint: [""]
+    entrypoint: []
   stage: container
-  needs: ["container_build"]
+  needs: 
+    - container_build
   script:
     - trivy image --format template --template "@contrib/gitlab.tpl" -o gl-container-scanning-report.json $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
   artifacts:
@@ -435,6 +506,9 @@ pages:
     - mkdir -p public/reports
     - cp test-summary.md public/reports/ || true
     - cp coverage.lcov public/reports/ || true
+    - cp security-summary.md public/reports/ || true
+    - cp gl-sast-report.json public/reports/ || true
+    - cp gl-secret-detection-report.json public/reports/ || true
   artifacts:
     paths:
       - public
