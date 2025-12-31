@@ -1,11 +1,14 @@
 # GitLab CI/CD Pipeline for FerrisProof
-# Follows the same structure as the local pipeline with GitLab-specific optimizations
+# Enhanced pipeline with comprehensive testing including property-based tests
 
 variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: "1"
+  # Property-based test configuration
   PROPTEST_CASES: "1000"
+  PROPTEST_MAX_SHRINK_ITERS: "10000"
+  PROPTEST_TIMEOUT: "300000"  # 5 minutes in milliseconds
   # Use GitLab's container registry
   REGISTRY: $CI_REGISTRY
   IMAGE_NAME: $CI_PROJECT_PATH
@@ -17,6 +20,7 @@ variables:
 stages:
   - validate
   - test
+  - property-test
   - security
   - build
   - container
@@ -73,13 +77,14 @@ clippy_lint:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
-# Test stage
-test_debug:
+# Test stage - Unit and Integration Tests
+test_unit:
   <<: *rust_job
   stage: test
   script:
     - cargo build --all-features
-    - cargo test --all-features
+    - cargo test --lib --all-features --workspace --verbose
+  timeout: 15 minutes
   artifacts:
     reports:
       junit: target/nextest/ci/junit.xml
@@ -89,12 +94,17 @@ test_debug:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
-test_property:
+test_integration:
   <<: *rust_job
   stage: test
   script:
-    - cargo test --all-features -- --ignored
-  allow_failure: true
+    - cargo test --tests --all-features --workspace --verbose
+  timeout: 20 minutes
+  artifacts:
+    when: always
+    paths:
+      - target/debug/
+    expire_in: 1 day
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -110,16 +120,111 @@ test_docs:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
 
+# Property-based test stage
+property_test_config:
+  <<: *rust_job
+  stage: property-test
+  script:
+    - echo "Running configuration property tests..."
+    - cargo test --manifest-path ferris-proof-config/Cargo.toml property_tests --verbose -- --nocapture
+    - cargo test --manifest-path ferris-proof-config/Cargo.toml standalone_property_test --verbose -- --nocapture
+  timeout: 30 minutes
+  variables:
+    PROPTEST_CASES: "1000"
+    PROPTEST_MAX_SHRINK_ITERS: "10000"
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/property-config-junit.xml
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+property_test_core:
+  <<: *rust_job
+  stage: property-test
+  script:
+    - echo "Running core property tests..."
+    - cargo test --manifest-path ferris-proof-core/Cargo.toml cache_property_tests --verbose -- --nocapture
+    - cargo test --manifest-path ferris-proof-core/Cargo.toml project_structure --verbose -- --nocapture
+    - cargo test --manifest-path ferris-proof-core/Cargo.toml project_setup_test --verbose -- --nocapture
+  timeout: 45 minutes
+  variables:
+    PROPTEST_CASES: "1000"
+    PROPTEST_MAX_SHRINK_ITERS: "10000"
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/property-core-junit.xml
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+property_test_plugins:
+  <<: *rust_job
+  stage: property-test
+  script:
+    - echo "Running plugin property tests..."
+    - cargo test --manifest-path ferris-proof-plugins/Cargo.toml network_isolation_tests --verbose -- --nocapture
+    - cargo test --manifest-path ferris-proof-plugins/Cargo.toml plugin_system_tests --verbose -- --nocapture
+  timeout: 30 minutes
+  variables:
+    PROPTEST_CASES: "1000"
+    PROPTEST_MAX_SHRINK_ITERS: "10000"
+  artifacts:
+    when: always
+    reports:
+      junit: target/nextest/ci/property-plugins-junit.xml
+    expire_in: 1 week
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Extended property tests for main branch and tags
+property_test_extended:
+  <<: *rust_job
+  stage: property-test
+  script:
+    - echo "Running extended property tests with higher iteration counts..."
+    - cargo test --all-features -- property --nocapture
+  timeout: 60 minutes
+  variables:
+    PROPTEST_CASES: "10000"
+    PROPTEST_MAX_SHRINK_ITERS: "100000"
+    PROPTEST_TIMEOUT: "3600000"  # 1 hour
+  artifacts:
+    when: always
+    paths:
+      - proptest-regressions/
+    expire_in: 1 week
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
 # Coverage job
 coverage:
   <<: *rust_job
   stage: test
   before_script:
-    - apt-get update && apt-get install -y pkg-config libssl-dev
+    - apt-get update && apt-get install -y pkg-config libssl-dev lcov
     - rustup component add llvm-tools-preview
     - cargo install cargo-llvm-cov
   script:
-    - cargo llvm-cov --all-features --workspace --lcov --output-path coverage.lcov
+    - echo "Generating unit test coverage..."
+    - cargo llvm-cov --lib --all-features --workspace --lcov --output-path lcov-unit.info
+    - echo "Generating integration test coverage..."
+    - cargo llvm-cov --tests --all-features --workspace --lcov --output-path lcov-integration.info
+    - echo "Generating property test coverage..."
+    - cargo llvm-cov --all-features --workspace --lcov --output-path lcov-property.info -- property || true
+    - echo "Merging coverage reports..."
+    - lcov --add-tracefile lcov-unit.info --add-tracefile lcov-integration.info --add-tracefile lcov-property.info --output-file coverage.lcov
+    - lcov --summary coverage.lcov
   coverage: '/lines......: \d+\.\d+%/'
   artifacts:
     reports:
@@ -128,7 +233,48 @@ coverage:
         path: coverage.xml
     paths:
       - coverage.lcov
+      - lcov-*.info
     expire_in: 1 week
+  variables:
+    PROPTEST_CASES: "100"  # Reduced for coverage to avoid timeout
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# Test report generation
+test_report:
+  <<: *rust_job
+  stage: property-test
+  needs: 
+    - test_unit
+    - test_integration
+    - property_test_config
+    - property_test_core
+    - property_test_plugins
+  before_script:
+    - apt-get update && apt-get install -y pkg-config libssl-dev
+    - cargo install cargo-nextest
+  script:
+    - echo "Generating comprehensive test report..."
+    - cargo nextest run --all-features --workspace --reporter junit --output-file test-results.xml || true
+    - echo "Collecting property test information..."
+    - cargo test --all-features -- --list | grep -E "(property|proptest)" > property-tests.txt || true
+    - echo "Creating test summary..."
+    - echo "# FerrisProof Test Summary" > test-summary.md
+    - echo "## Test Execution Results" >> test-summary.md
+    - echo "- Unit tests: $(cargo test --lib --all-features -- --list 2>/dev/null | wc -l)" >> test-summary.md
+    - echo "- Integration tests: $(cargo test --tests --all-features -- --list 2>/dev/null | wc -l)" >> test-summary.md
+    - echo "- Property tests: $(wc -l < property-tests.txt)" >> test-summary.md
+    - echo "- Date: $(date)" >> test-summary.md
+    - cat test-summary.md
+  artifacts:
+    when: always
+    paths:
+      - test-results.xml
+      - test-summary.md
+      - property-tests.txt
+    expire_in: 1 week
+  allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
     - if: $CI_COMMIT_TAG
@@ -164,6 +310,12 @@ dependency_check:
 .build_template: &build_template
   <<: *rust_job
   stage: build
+  needs: 
+    - test_unit
+    - test_integration
+    - property_test_config
+    - property_test_core
+    - property_test_plugins
   script:
     - rustup target add $TARGET
     - |
@@ -209,6 +361,9 @@ build_macos:
 container_build:
   image: quay.io/podman/stable:latest
   stage: container
+  needs:
+    - build_linux_gnu
+    - build_linux_musl
   services:
     - docker:dind
   variables:
@@ -276,6 +431,10 @@ pages:
     - cargo doc --all-features --no-deps
     - mkdir public
     - cp -r target/doc/* public/
+    # Add test reports to documentation
+    - mkdir -p public/reports
+    - cp test-summary.md public/reports/ || true
+    - cp coverage.lcov public/reports/ || true
   artifacts:
     paths:
       - public
@@ -291,12 +450,13 @@ release:
     - build_linux_gnu
     - build_linux_musl
     - container_build
+    - test_report
   script:
     - echo "Creating release for $CI_COMMIT_TAG"
   release:
     tag_name: $CI_COMMIT_TAG
     name: 'Release $CI_COMMIT_TAG'
-    description: 'Release $CI_COMMIT_TAG of FerrisProof'
+    description: 'Release $CI_COMMIT_TAG of FerrisProof - Multi-layer correctness pipeline for Rust applications'
     assets:
       links:
         - name: 'Linux GNU Binary'
@@ -305,6 +465,8 @@ release:
           url: '$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/raw/artifacts/ferris-proof-x86_64-unknown-linux-musl?job=build_linux_musl'
         - name: 'Container Image'
           url: '$CI_REGISTRY_IMAGE:$CI_COMMIT_TAG'
+        - name: 'Test Report'
+          url: '$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/file/test-summary.md?job=test_report'
   rules:
     - if: $CI_COMMIT_TAG
 

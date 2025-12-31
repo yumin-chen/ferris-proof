@@ -1,4 +1,4 @@
-use ferris_proof_config::{ConfigManager, Config, ProfileConfig, ToolConfig, FeatureConfig, Thresholds, CiConfig};
+use ferris_proof_config::{ConfigManager, config::{Config, ProfileConfig, ToolConfig, FeatureConfig, Thresholds, CiConfig}};
 use ferris_proof_core::{VerificationLevel, EnforcementMode, Technique};
 use std::path::PathBuf;
 use tempfile::TempDir;

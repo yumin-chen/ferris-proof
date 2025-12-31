@@ -9,6 +9,10 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Property-based test configuration
+  PROPTEST_CASES: 1000
+  PROPTEST_MAX_SHRINK_ITERS: 10000
+  PROPTEST_TIMEOUT: 300000  # 5 minutes in milliseconds
 
 jobs:
   test:
@@ -60,13 +64,79 @@ jobs:
     - name: Build
       run: cargo build --verbose --all-features
 
-    - name: Run tests
-      run: cargo test --verbose --all-features
+    - name: Run unit tests
+      run: cargo test --verbose --all-features --lib
+      timeout-minutes: 10
+
+    - name: Run integration tests
+      run: cargo test --verbose --all-features --test '*'
+      timeout-minutes: 15
 
     - name: Run property-based tests
       run: cargo test --verbose --all-features -- --ignored
+      timeout-minutes: 20
       env:
         PROPTEST_CASES: 1000
+        PROPTEST_MAX_SHRINK_ITERS: 10000
+
+    - name: Run all property tests (including non-ignored)
+      run: |
+        # Run property tests in each crate separately for better reporting
+        echo "Running property tests in ferris-proof-config..."
+        cargo test --manifest-path ferris-proof-config/Cargo.toml property_tests --verbose
+        
+        echo "Running property tests in ferris-proof-core..."
+        cargo test --manifest-path ferris-proof-core/Cargo.toml cache_property_tests --verbose
+        cargo test --manifest-path ferris-proof-core/Cargo.toml project_structure --verbose
+        
+        echo "Running property tests in ferris-proof-plugins..."
+        cargo test --manifest-path ferris-proof-plugins/Cargo.toml network_isolation_tests --verbose
+      timeout-minutes: 25
+      env:
+        PROPTEST_CASES: 1000
+        PROPTEST_MAX_SHRINK_ITERS: 10000
+
+    - name: Run standalone property tests
+      run: |
+        echo "Running standalone property tests..."
+        cargo test --manifest-path ferris-proof-config/Cargo.toml standalone_property_test --verbose
+        if [ -f test_property_standalone.rs ]; then
+          echo "Running root standalone property test..."
+          rustc --test test_property_standalone.rs -o test_standalone --extern proptest --extern ferris_proof_config=target/debug/deps/libferris_proof_config-*.rlib
+          ./test_standalone
+        fi
+      timeout-minutes: 15
+      env:
+        PROPTEST_CASES: 500  # Reduced for standalone tests
+
+  property-test-stress:
+    name: Property Test Stress Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-stress-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run extended property tests
+      run: |
+        echo "Running extended property-based tests with high iteration counts..."
+        cargo test --verbose --all-features -- property
+      timeout-minutes: 45
+      env:
+        PROPTEST_CASES: 10000
+        PROPTEST_MAX_SHRINK_ITERS: 100000
+        PROPTEST_TIMEOUT: 1800000  # 30 minutes
 
   coverage:
     name: Code Coverage
@@ -82,14 +152,82 @@ jobs:
     - name: Install cargo-llvm-cov
       uses: taiki-e/install-action@cargo-llvm-cov
 
-    - name: Generate code coverage
-      run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+    - name: Generate code coverage (unit tests)
+      run: cargo llvm-cov --all-features --workspace --lib --lcov --output-path lcov-unit.info
+
+    - name: Generate code coverage (integration tests)
+      run: cargo llvm-cov --all-features --workspace --tests --lcov --output-path lcov-integration.info
+
+    - name: Generate code coverage (property tests)
+      run: |
+        cargo llvm-cov --all-features --workspace --lcov --output-path lcov-property.info -- property
+      env:
+        PROPTEST_CASES: 100  # Reduced for coverage to avoid timeout
+
+    - name: Merge coverage reports
+      run: |
+        # Install lcov for merging
+        sudo apt-get install -y lcov
+        lcov --add-tracefile lcov-unit.info --add-tracefile lcov-integration.info --add-tracefile lcov-property.info --output-file lcov.info
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         files: lcov.info
         fail_ci_if_error: true
+
+  test-matrix:
+    name: Extended Test Matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        rust: [stable, nightly]
+        test-type: [unit, integration, property]
+        include:
+          - os: windows-latest
+            rust: stable
+            test-type: unit
+          - os: windows-latest
+            rust: stable
+            test-type: integration
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ matrix.rust }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run unit tests
+      if: matrix.test-type == 'unit'
+      run: cargo test --verbose --all-features --lib
+      timeout-minutes: 10
+
+    - name: Run integration tests
+      if: matrix.test-type == 'integration'
+      run: cargo test --verbose --all-features --test '*'
+      timeout-minutes: 15
+
+    - name: Run property tests
+      if: matrix.test-type == 'property'
+      run: |
+        cargo test --verbose --all-features -- property
+        cargo test --verbose --all-features -- proptest
+      timeout-minutes: 30
+      env:
+        PROPTEST_CASES: 500
+        PROPTEST_MAX_SHRINK_ITERS: 5000
 
   security:
     name: Security Audit
@@ -102,10 +240,50 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
 
+  test-report:
+    name: Test Report Generation
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [test, property-test-stress, test-matrix]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@nextest
+
+    - name: Generate detailed test report
+      run: |
+        echo "Generating comprehensive test report..."
+        cargo nextest run --all-features --workspace --reporter junit --output-file test-results.xml
+        
+        echo "Running property test summary..."
+        cargo test --all-features -- --list | grep -E "(property|proptest)" > property-tests.txt || true
+        
+        echo "Test summary:" > test-summary.md
+        echo "- Unit tests: $(cargo test --all-features --lib -- --list | wc -l)" >> test-summary.md
+        echo "- Integration tests: $(cargo test --all-features --test '*' -- --list | wc -l)" >> test-summary.md
+        echo "- Property tests: $(wc -l < property-tests.txt)" >> test-summary.md
+        
+        cat test-summary.md
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          test-results.xml
+          test-summary.md
+          property-tests.txt
+
   build-release:
     name: Build Release Binaries
     runs-on: ${{ matrix.os }}
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, coverage, security]
     strategy:
       matrix:
         include:
@@ -159,6 +337,7 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, coverage, security]
     steps:
     - uses: actions/checkout@v4
 

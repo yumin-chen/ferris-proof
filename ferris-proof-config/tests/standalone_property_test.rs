@@ -252,8 +252,8 @@ proptest! {
             // Verify that the resolved config has valid techniques for its level
             let expected_techniques = get_techniques_for_level(resolved_config.level);
             prop_assert_eq!(
-                resolved_config.enabled_techniques,
-                expected_techniques,
+                resolved_config.enabled_techniques.clone(),
+                expected_techniques.clone(),
                 "Resolved config for {} should have techniques {:?} for level {:?}, but got {:?}",
                 file_path, expected_techniques, resolved_config.level, resolved_config.enabled_techniques
             );

@@ -1,0 +1,70 @@
+# Property-based test configuration for FerrisProof
+# This file configures proptest behavior across all crates
+
+# Number of test cases to generate for each property test
+# Can be overridden by PROPTEST_CASES environment variable
+cases = 1000
+
+# Maximum number of shrinking iterations when a test fails
+# Can be overridden by PROPTEST_MAX_SHRINK_ITERS environment variable
+max_shrink_iters = 10000
+
+# Timeout for each individual test case in milliseconds
+# Can be overridden by PROPTEST_TIMEOUT environment variable
+timeout = 300000  # 5 minutes
+
+# Source file for storing regression test cases
+# This helps ensure that previously found bugs don't reoccur
+source_file = "proptest-regressions"
+
+# Strategy for generating test cases
+# "fork" creates separate processes for each test case (more isolation)
+# "no-fork" runs all test cases in the same process (faster)
+fork = false
+
+# Verbose output for debugging
+verbose = 0
+
+# Failure persistence - how to handle test failures
+# "FailurePersistence::SourceParallel" stores failures in source files
+failure_persistence = "SourceParallel"
+
+# Test case generation strategy
+# "arbitrary" uses the Arbitrary trait implementation
+# "uniform" generates values uniformly across the range
+strategy = "arbitrary"
+
+# Shrinking strategy when a test fails
+# "linear" tries to reduce values linearly
+# "binary" uses binary search to find minimal failing case
+shrink_strategy = "linear"
+
+# Maximum size for generated collections (Vec, HashMap, etc.)
+max_flat_map_regens = 1000000
+
+# Configuration for specific test patterns
+[test_filter]
+# Only run property tests matching these patterns
+include = ["property", "proptest", "prop_"]
+
+# Exclude tests matching these patterns
+exclude = ["slow_", "manual_"]
+
+# Environment-specific configurations
+[env.ci]
+# Reduced settings for CI to avoid timeouts
+cases = 500
+max_shrink_iters = 5000
+timeout = 180000  # 3 minutes
+
+[env.nightly]
+# Extended settings for nightly testing
+cases = 10000
+max_shrink_iters = 100000
+timeout = 1800000  # 30 minutes
+
+[env.fuzzing]
+# Intensive settings for fuzzing
+cases = 100000
+max_shrink_iters = 1000000
+timeout = 7200000  # 2 hours
