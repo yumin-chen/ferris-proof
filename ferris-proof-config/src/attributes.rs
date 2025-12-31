@@ -1,26 +1,31 @@
 use crate::config::Config;
 use anyhow::Result;
+use ferris_proof_core::{EnforcementMode, Technique, VerificationLevel};
 use std::path::Path;
 use tracing::debug;
-use ferris_proof_core::{VerificationLevel, EnforcementMode, Technique};
 
 /// Parse verification attributes from a Rust file
 pub fn parse_verification_attributes(file_path: &Path) -> Result<Option<Config>> {
     debug!("Parsing verification attributes from: {:?}", file_path);
-    
+
     // Only parse .rs files
-    if !file_path.extension().and_then(|s| s.to_str()).map(|s| s == "rs").unwrap_or(false) {
+    if !file_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s == "rs")
+        .unwrap_or(false)
+    {
         return Ok(None);
     }
-    
+
     // Read the file content
     let content = std::fs::read_to_string(file_path)?;
-    
+
     // Look for verification attributes
     if let Some(config) = parse_verification_attribute_from_content(&content)? {
         return Ok(Some(config));
     }
-    
+
     Ok(None)
 }
 
@@ -48,7 +53,7 @@ fn parse_verification_attribute_from_content(content: &str) -> Result<Option<Con
                 config.profile.level = VerificationLevel::Minimal;
                 return Ok(Some(config));
             }
-            
+
             // Handle multi-line attributes
             if line.ends_with("(") {
                 // This is a multi-line attribute, we need to parse it more carefully
@@ -56,7 +61,7 @@ fn parse_verification_attribute_from_content(content: &str) -> Result<Option<Con
             }
         }
     }
-    
+
     Ok(None)
 }
 
@@ -64,7 +69,7 @@ fn parse_verification_attribute_from_content(content: &str) -> Result<Option<Con
 fn parse_multiline_attribute(content: &str, _start_line: &str) -> Result<Option<Config>> {
     let mut config = Config::default();
     let mut found_attribute = false;
-    
+
     // Simple parsing for the test case
     if content.contains("level = \"strict\"") {
         config.profile.level = VerificationLevel::Strict;
@@ -79,7 +84,7 @@ fn parse_multiline_attribute(content: &str, _start_line: &str) -> Result<Option<
         config.profile.level = VerificationLevel::Minimal;
         found_attribute = true;
     }
-    
+
     if content.contains("enforcement = \"error\"") {
         config.profile.enforcement = EnforcementMode::Error;
         found_attribute = true;
@@ -87,7 +92,7 @@ fn parse_multiline_attribute(content: &str, _start_line: &str) -> Result<Option<
         config.profile.enforcement = EnforcementMode::Warning;
         found_attribute = true;
     }
-    
+
     // Parse techniques
     if content.contains("techniques = [") {
         let mut techniques = Vec::new();
@@ -108,7 +113,7 @@ fn parse_multiline_attribute(content: &str, _start_line: &str) -> Result<Option<
             found_attribute = true;
         }
     }
-    
+
     if found_attribute {
         Ok(Some(config))
     } else {
@@ -119,14 +124,14 @@ fn parse_multiline_attribute(content: &str, _start_line: &str) -> Result<Option<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     #[test]
     fn test_ignore_non_rs_files() {
         let mut temp_file = NamedTempFile::with_suffix(".txt").unwrap();
         temp_file.write_all(b"#[verification(formal)]").unwrap();
-        
+
         let result = parse_verification_attributes(temp_file.path()).unwrap();
         assert!(result.is_none());
     }
@@ -135,7 +140,7 @@ mod tests {
     fn test_parse_empty_rs_file() {
         let mut temp_file = NamedTempFile::with_suffix(".rs").unwrap();
         temp_file.write_all(b"fn main() {}").unwrap();
-        
+
         let result = parse_verification_attributes(temp_file.path()).unwrap();
         assert!(result.is_none());
     }

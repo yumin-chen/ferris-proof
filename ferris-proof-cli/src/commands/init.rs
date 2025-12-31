@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
-use ferris_proof_core::{VerificationLevel, EnforcementMode, Technique};
+use colored::Colorize;
+use console::Term;
 use ferris_proof_config::{Config, ProfileConfig};
+use ferris_proof_core::{EnforcementMode, Technique, VerificationLevel};
 use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
-use colored::Colorize;
-use console::Term;
 
 pub async fn run(
     level: VerificationLevel,
@@ -13,14 +13,14 @@ pub async fn run(
     template: Option<String>,
 ) -> Result<i32> {
     let term = Term::stdout();
-    
+
     if interactive {
         println!("{}", "🦀 FerrisProof Project Initialization".bold().cyan());
         println!();
-        
+
         let level = prompt_verification_level(&term)?;
         let template = prompt_template(&term)?;
-        
+
         initialize_project(level, template.as_deref(), &term).await
     } else {
         initialize_project(level, template.as_deref(), &Term::stdout()).await
@@ -31,17 +31,23 @@ fn prompt_verification_level(term: &Term) -> Result<VerificationLevel> {
     println!("Select verification level:");
     println!("  1. {} - Type safety only", "Minimal".yellow());
     println!("  2. {} - + Property-based testing", "Standard".green());
-    println!("  3. {} - + Session types, refinement types, concurrency testing", "Strict".blue());
-    println!("  4. {} - + Formal specifications (TLA+, Alloy)", "Formal".magenta());
+    println!(
+        "  3. {} - + Session types, refinement types, concurrency testing",
+        "Strict".blue()
+    );
+    println!(
+        "  4. {} - + Formal specifications (TLA+, Alloy)",
+        "Formal".magenta()
+    );
     println!();
-    
+
     loop {
         print!("Enter choice (1-4) [default: 2]: ");
         io::stdout().flush()?;
-        
+
         let input = term.read_line()?;
         let choice = input.trim();
-        
+
         match choice {
             "" | "2" => return Ok(VerificationLevel::Standard),
             "1" => return Ok(VerificationLevel::Minimal),
@@ -57,20 +63,20 @@ fn prompt_verification_level(term: &Term) -> Result<VerificationLevel> {
 
 fn prompt_template(term: &Term) -> Result<Option<String>> {
     println!("Available project templates:");
-    println!("  1. {} - Basic Rust project with minimal verification", "minimal");
-    println!("  2. {} - Standard web service with property testing", "standard");
-    println!("  3. {} - Strict verification with session types", "strict");
-    println!("  4. {} - Full formal verification setup", "formal");
-    println!("  5. {} - Use current directory as-is", "none");
+    println!("  1. minimal - Basic Rust project with minimal verification");
+    println!("  2. standard - Standard web service with property testing");
+    println!("  3. strict - Strict verification with session types");
+    println!("  4. formal - Full formal verification setup");
+    println!("  5. none - Use current directory as-is");
     println!();
-    
+
     loop {
         print!("Select template (1-5) [default: 2]: ");
         io::stdout().flush()?;
-        
+
         let input = term.read_line()?;
         let choice = input.trim();
-        
+
         match choice {
             "" | "2" => return Ok(Some("standard".to_string())),
             "1" => return Ok(Some("minimal".to_string())),
@@ -90,60 +96,81 @@ async fn initialize_project(
     _template: Option<&str>,
     _term: &Term,
 ) -> Result<i32> {
-    println!("Initializing FerrisProof project with level: {}", format!("{:?}", level).green());
-    
+    println!(
+        "Initializing FerrisProof project with level: {}",
+        format!("{:?}", level).green()
+    );
+
     // Check if ferrisproof.toml already exists
     if Path::new("ferrisproof.toml").exists() {
-        println!("{}", "Warning: ferrisproof.toml already exists. Overwriting...".yellow());
+        println!(
+            "{}",
+            "Warning: ferrisproof.toml already exists. Overwriting...".yellow()
+        );
     }
-    
+
     // Create configuration based on verification level
     let config = create_config_for_level(level);
-    
+
     // Write configuration file
     write_config_file(&config)?;
     println!("✓ Created {}", "ferrisproof.toml".green());
-    
+
     // Create directory structure
     create_directory_structure(level, _template).await?;
-    
+
     // Create template files if specified
     if let Some(template_name) = _template {
         create_template_files(template_name, level).await?;
     }
-    
+
     println!();
     println!("{}", "🎉 Project initialized successfully!".bold().green());
     println!();
     println!("Next steps:");
-    println!("  1. Review the generated {} file", "ferrisproof.toml".cyan());
-    println!("  2. Run {} to check your project", "ferris-proof check".cyan());
-    
+    println!(
+        "  1. Review the generated {} file",
+        "ferrisproof.toml".cyan()
+    );
+    println!(
+        "  2. Run {} to check your project",
+        "ferris-proof check".cyan()
+    );
+
     match level {
         VerificationLevel::Minimal => {
-            println!("  3. Consider upgrading to {} level for property testing", "standard".green());
+            println!(
+                "  3. Consider upgrading to {} level for property testing",
+                "standard".green()
+            );
         }
         VerificationLevel::Standard => {
-            println!("  3. Add property tests to your {} directory", "tests/".cyan());
+            println!(
+                "  3. Add property tests to your {} directory",
+                "tests/".cyan()
+            );
         }
         VerificationLevel::Strict => {
-            println!("  3. Define session types in the {} directory", "specs/session-types/".cyan());
+            println!(
+                "  3. Define session types in the {} directory",
+                "specs/session-types/".cyan()
+            );
         }
         VerificationLevel::Formal => {
-            println!("  3. Create formal specifications in {} directory", "specs/formal/".cyan());
+            println!(
+                "  3. Create formal specifications in {} directory",
+                "specs/formal/".cyan()
+            );
         }
     }
-    
+
     Ok(0)
 }
 
 fn create_config_for_level(level: VerificationLevel) -> Config {
     let techniques = match level {
         VerificationLevel::Minimal => vec![Technique::TypeSafety],
-        VerificationLevel::Standard => vec![
-            Technique::TypeSafety,
-            Technique::PropertyTests,
-        ],
+        VerificationLevel::Standard => vec![Technique::TypeSafety, Technique::PropertyTests],
         VerificationLevel::Strict => vec![
             Technique::TypeSafety,
             Technique::PropertyTests,
@@ -161,7 +188,7 @@ fn create_config_for_level(level: VerificationLevel) -> Config {
             Technique::ModelChecking,
         ],
     };
-    
+
     Config {
         profile: ProfileConfig {
             level,
@@ -173,30 +200,31 @@ fn create_config_for_level(level: VerificationLevel) -> Config {
 }
 
 fn write_config_file(config: &Config) -> Result<()> {
-    let toml_content = toml::to_string_pretty(config)
-        .context("Failed to serialize configuration to TOML")?;
-    
+    let toml_content =
+        toml::to_string_pretty(config).context("Failed to serialize configuration to TOML")?;
+
     let content = format!(
         "# FerrisProof Configuration\n# Generated by ferris-proof init\n\n{}\n",
         toml_content
     );
-    
-    fs::write("ferrisproof.toml", content)
-        .context("Failed to write ferrisproof.toml")?;
-    
+
+    fs::write("ferrisproof.toml", content).context("Failed to write ferrisproof.toml")?;
+
     Ok(())
 }
 
-async fn create_directory_structure(level: VerificationLevel, _template: Option<&str>) -> Result<()> {
+async fn create_directory_structure(
+    level: VerificationLevel,
+    _template: Option<&str>,
+) -> Result<()> {
     // Always create these directories
     let base_dirs = vec!["specs", "tests"];
-    
+
     for dir in base_dirs {
-        fs::create_dir_all(dir)
-            .with_context(|| format!("Failed to create directory: {}", dir))?;
+        fs::create_dir_all(dir).with_context(|| format!("Failed to create directory: {}", dir))?;
         println!("✓ Created directory {}", dir.green());
     }
-    
+
     // Create level-specific directories
     match level {
         VerificationLevel::Minimal => {
@@ -229,7 +257,7 @@ async fn create_directory_structure(level: VerificationLevel, _template: Option<
             println!("✓ Created directory {}", "specs/formal/alloy".green());
         }
     }
-    
+
     Ok(())
 }
 
@@ -267,10 +295,10 @@ This project uses FerrisProof for verification at the **minimal** level.
 
 See `ferrisproof.toml` for current configuration.
 "#;
-    
+
     fs::write("README.md", readme_content)?;
     println!("✓ Created {}", "README.md".green());
-    
+
     Ok(())
 }
 
@@ -313,10 +341,10 @@ proptest! {
 
 See `ferrisproof.toml` for current configuration.
 "#;
-    
+
     fs::write("README.md", readme_content)?;
     println!("✓ Created {}", "README.md".green());
-    
+
     // Create example property test
     let property_test_content = r#"use proptest::prelude::*;
 
@@ -342,16 +370,22 @@ mod tests {
     }
 }
 "#;
-    
-    fs::write("tests/property/example_properties.rs", property_test_content)?;
-    println!("✓ Created {}", "tests/property/example_properties.rs".green());
-    
+
+    fs::write(
+        "tests/property/example_properties.rs",
+        property_test_content,
+    )?;
+    println!(
+        "✓ Created {}",
+        "tests/property/example_properties.rs".green()
+    );
+
     Ok(())
 }
 
 async fn create_strict_template() -> Result<()> {
     create_standard_template().await?;
-    
+
     // Create session type example
     let session_type_content = r#"// Example session type definition
 // This would be expanded by FerrisProof macros
@@ -372,16 +406,22 @@ pub enum ProtocolState {
 // let protocol = protocol.authenticate(42)?;
 // protocol.close();
 "#;
-    
-    fs::write("specs/session-types/example_protocol.rs", session_type_content)?;
-    println!("✓ Created {}", "specs/session-types/example_protocol.rs".green());
-    
+
+    fs::write(
+        "specs/session-types/example_protocol.rs",
+        session_type_content,
+    )?;
+    println!(
+        "✓ Created {}",
+        "specs/session-types/example_protocol.rs".green()
+    );
+
     Ok(())
 }
 
 async fn create_formal_template() -> Result<()> {
     create_strict_template().await?;
-    
+
     // Create TLA+ specification example
     let tla_spec_content = r#"---- MODULE ExampleProtocol ----
 EXTENDS Naturals, Sequences, TLC
@@ -426,10 +466,13 @@ AllNodesComplete == <>(\A n \in Nodes : nodeState[n] = "done")
 
 ====
 "#;
-    
+
     fs::write("specs/formal/tla/example_protocol.tla", tla_spec_content)?;
-    println!("✓ Created {}", "specs/formal/tla/example_protocol.tla".green());
-    
+    println!(
+        "✓ Created {}",
+        "specs/formal/tla/example_protocol.tla".green()
+    );
+
     // Create Alloy specification example
     let alloy_spec_content = r#"// Example Alloy specification
 module ExampleProtocol
@@ -479,9 +522,15 @@ assert NoOrphanMessages {
 
 check NoOrphanMessages for 5
 "#;
-    
-    fs::write("specs/formal/alloy/example_protocol.als", alloy_spec_content)?;
-    println!("✓ Created {}", "specs/formal/alloy/example_protocol.als".green());
-    
+
+    fs::write(
+        "specs/formal/alloy/example_protocol.als",
+        alloy_spec_content,
+    )?;
+    println!(
+        "✓ Created {}",
+        "specs/formal/alloy/example_protocol.als".green()
+    );
+
     Ok(())
 }

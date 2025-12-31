@@ -1,7 +1,7 @@
-use crate::cache::{VerificationCache, CompactionResult};
+use crate::cache::{CompactionResult, VerificationCache};
 use anyhow::Result;
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Cache management operations for CLI and programmatic use
 pub struct CacheManager {
@@ -63,7 +63,9 @@ impl CacheManager {
 
         Ok(CleanupResult {
             entries_removed: expired_removed,
-            size_freed: initial_info.disk_size_bytes.saturating_sub(final_info.disk_size_bytes),
+            size_freed: initial_info
+                .disk_size_bytes
+                .saturating_sub(final_info.disk_size_bytes),
             entries_before: initial_info.total_entries,
             entries_after: final_info.total_entries,
         })
@@ -102,13 +104,15 @@ impl CacheManager {
         if info.disk_size_bytes > 1_000_000_000 {
             // > 1GB
             recommendations.push(
-                "Cache size is large (>1GB). Consider running compact to optimize storage".to_string()
+                "Cache size is large (>1GB). Consider running compact to optimize storage"
+                    .to_string(),
             );
         }
 
         if !integrity_errors.is_empty() {
             recommendations.push(
-                "Cache integrity issues detected. Consider clearing and rebuilding cache".to_string()
+                "Cache integrity issues detected. Consider clearing and rebuilding cache"
+                    .to_string(),
             );
         }
 
@@ -127,7 +131,7 @@ impl CacheManager {
     pub fn repair(&mut self) -> Result<RepairResult> {
         let initial_info = self.info()?;
         let integrity_errors = self.cache.validate_integrity()?;
-        
+
         if integrity_errors.is_empty() {
             return Ok(RepairResult {
                 corrupted_entries_removed: 0,
@@ -226,19 +230,21 @@ impl Default for CacheManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
-    use crate::cache::{CacheKey, CacheEntry, ContentHash, ConfigHash, ToolVersions, CacheMetadata};
-    use crate::types::{LayerResult, Layer, Status};
+    use crate::cache::{
+        CacheEntry, CacheKey, CacheMetadata, ConfigHash, ContentHash, ToolVersions,
+    };
+    use crate::types::{Layer, LayerResult, Status};
     use std::time::Duration;
+    use tempfile::TempDir;
 
     #[test]
     fn test_cache_manager_info() {
         let temp_dir = TempDir::new().unwrap();
         let cache_dir = temp_dir.path().join("cache");
-        
+
         let manager = CacheManager::with_cache_dir(cache_dir.clone());
         let info = manager.info().unwrap();
-        
+
         assert_eq!(info.cache_dir, cache_dir);
         assert_eq!(info.total_entries, 0);
         assert_eq!(info.valid_entries, 0);
@@ -249,9 +255,9 @@ mod tests {
     fn test_cache_manager_cleanup() {
         let temp_dir = TempDir::new().unwrap();
         let cache_dir = temp_dir.path().join("cache");
-        
+
         let mut manager = CacheManager::with_cache_dir(cache_dir);
-        
+
         // Add some test entries (some expired)
         let cache_key = CacheKey {
             content_hash: ContentHash("test_hash".to_string()),
@@ -262,7 +268,7 @@ mod tests {
             },
             layer: Layer::PropertyBased,
         };
-        
+
         let expired_entry = CacheEntry {
             result: LayerResult {
                 layer: Layer::PropertyBased,
@@ -280,9 +286,9 @@ mod tests {
                 cache_hit_count: 0,
             },
         };
-        
+
         manager.cache_mut().store(cache_key, expired_entry);
-        
+
         let cleanup_result = manager.cleanup().unwrap();
         assert_eq!(cleanup_result.entries_removed, 1);
         assert_eq!(cleanup_result.entries_before, 1);
@@ -293,9 +299,9 @@ mod tests {
     fn test_cache_manager_clear() {
         let temp_dir = TempDir::new().unwrap();
         let cache_dir = temp_dir.path().join("cache");
-        
+
         let mut manager = CacheManager::with_cache_dir(cache_dir);
-        
+
         // Add a test entry
         let cache_key = CacheKey {
             content_hash: ContentHash("test_hash".to_string()),
@@ -306,7 +312,7 @@ mod tests {
             },
             layer: Layer::PropertyBased,
         };
-        
+
         let cache_entry = CacheEntry {
             result: LayerResult {
                 layer: Layer::PropertyBased,
@@ -324,12 +330,12 @@ mod tests {
                 cache_hit_count: 0,
             },
         };
-        
+
         manager.cache_mut().store(cache_key, cache_entry);
-        
+
         let clear_result = manager.clear().unwrap();
         assert_eq!(clear_result.entries_removed, 1);
-        
+
         let info_after = manager.info().unwrap();
         assert_eq!(info_after.total_entries, 0);
     }
@@ -338,10 +344,10 @@ mod tests {
     fn test_cache_manager_health_check() {
         let temp_dir = TempDir::new().unwrap();
         let cache_dir = temp_dir.path().join("cache");
-        
+
         let manager = CacheManager::with_cache_dir(cache_dir);
         let health_report = manager.health_check().unwrap();
-        
+
         assert!(health_report.integrity_errors.is_empty());
         assert!(!health_report.recommendations.is_empty());
         assert!(health_report.recommendations[0].contains("Cache is empty"));

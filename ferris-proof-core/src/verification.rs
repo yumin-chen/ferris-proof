@@ -1,10 +1,11 @@
-use crate::types::*;
 use crate::cache::VerificationCache;
 use crate::plugins::PluginManager;
+use crate::types::*;
 use anyhow::Result;
 use std::collections::HashMap;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
+#[allow(dead_code)]
 pub struct VerificationEngine {
     plugin_manager: PluginManager,
     cache: VerificationCache,
@@ -20,17 +21,17 @@ impl VerificationEngine {
 
     pub async fn verify(&self, targets: &[Target]) -> Result<VerificationResult> {
         info!("Starting verification for {} targets", targets.len());
-        
+
         let layer_results = HashMap::new();
         let start_time = std::time::Instant::now();
-        
+
         // TODO: Implement actual verification logic
         for target in targets {
             debug!("Verifying target: {:?}", target);
         }
-        
+
         let total_time = start_time.elapsed();
-        
+
         Ok(VerificationResult {
             overall_status: Status::Success,
             layer_results,
@@ -47,7 +48,7 @@ impl VerificationEngine {
 
     pub async fn verify_layer(&self, layer: Layer, target: &Target) -> Result<LayerResult> {
         info!("Verifying layer {:?} for target {:?}", layer, target);
-        
+
         // TODO: Implement layer-specific verification
         Ok(LayerResult {
             layer,

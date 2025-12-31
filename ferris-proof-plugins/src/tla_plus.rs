@@ -1,13 +1,37 @@
-use ferris_proof_core::{
-    plugins::{VerificationPlugin, ToolInfo, VerificationInput, VerificationOutput, PluginMetadata, VersionRange, StructuredResult, PerformanceMetrics},
-    types::{Technique, Status, ToolOutput, VerificationMetrics},
-};
 use anyhow::Result;
-use std::process::Command;
-use std::path::PathBuf;
-use tracing::{info};
+use ferris_proof_core::{
+    plugins::{
+        PerformanceMetrics, PluginMetadata, StructuredResult, ToolInfo, VerificationInput,
+        VerificationOutput, VerificationPlugin, VersionRange,
+    },
+    types::{Status, Technique, ToolOutput, VerificationMetrics},
+};
 use semver::Version;
 use serde_json::json;
+use std::path::PathBuf;
+use std::process::Command;
+use tracing::info;
+
+/// Simple replacement for which::which functionality
+fn find_executable(name: &str) -> Option<PathBuf> {
+    if let Ok(path_env) = std::env::var("PATH") {
+        for path in std::env::split_paths(&path_env) {
+            let candidate = path.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+            // Also try with .exe extension on Windows
+            #[cfg(windows)]
+            {
+                let candidate_exe = path.join(format!("{}.exe", name));
+                if candidate_exe.is_file() {
+                    return Some(candidate_exe);
+                }
+            }
+        }
+    }
+    None
+}
 
 pub struct TlaPlusPlugin {
     tlc_path: Option<PathBuf>,
@@ -17,7 +41,7 @@ pub struct TlaPlusPlugin {
 impl TlaPlusPlugin {
     pub fn new() -> Self {
         Self {
-            tlc_path: which::which("tlc").ok(),
+            tlc_path: find_executable("tlc"),
             initialized: false,
         }
     }
@@ -52,32 +76,34 @@ impl VerificationPlugin for TlaPlusPlugin {
                 // Try to find TLC in common locations
                 let common_paths = [
                     "/usr/local/bin/tlc",
-                    "/usr/bin/tlc", 
+                    "/usr/bin/tlc",
                     "/opt/tla/bin/tlc",
                     "tlc", // Try PATH
                 ];
-                
+
                 let mut found_path = None;
                 for path_str in &common_paths {
                     let path = PathBuf::from(path_str);
-                    if path.exists() || which::which(path_str).is_ok() {
+                    if path.exists() || find_executable(path_str).is_some() {
                         found_path = Some(path);
                         break;
                     }
                 }
-                
+
                 match found_path {
                     Some(path) => path,
-                    None => return Err(anyhow::anyhow!("TLA+ TLC not found in PATH or common locations")),
+                    None => {
+                        return Err(anyhow::anyhow!(
+                            "TLA+ TLC not found in PATH or common locations"
+                        ))
+                    }
                 }
             }
         };
-        
+
         // Try to get version information
-        let version_result = Command::new(&tlc_path)
-            .arg("-version")
-            .output();
-            
+        let version_result = Command::new(&tlc_path).arg("-version").output();
+
         match version_result {
             Ok(output) if output.status.success() => {
                 let version_str = String::from_utf8_lossy(&output.stdout);
@@ -88,14 +114,16 @@ impl VerificationPlugin for TlaPlusPlugin {
                         // Extract version from TLC output (format varies)
                         if line.contains("TLC") {
                             line.split_whitespace()
-                                .find(|word| word.chars().next().map_or(false, |c| c.is_ascii_digit()))
+                                .find(|word| {
+                                    word.chars().next().is_some_and(|c| c.is_ascii_digit())
+                                })
                                 .map(|s| s.to_string())
                         } else {
                             None
                         }
                     })
                     .unwrap_or_else(|| "unknown".to_string());
-                
+
                 Ok(ToolInfo {
                     name: "TLA+ TLC".to_string(),
                     version,
@@ -126,9 +154,9 @@ impl VerificationPlugin for TlaPlusPlugin {
         if !self.initialized {
             return Err(anyhow::anyhow!("TLA+ plugin not initialized"));
         }
-        
+
         info!("Running TLA+ verification for {:?}", input.target);
-        
+
         // TODO: Implement actual TLA+ verification
         let tool_output = ToolOutput {
             tool: "tlc".to_string(),
@@ -193,10 +221,7 @@ impl VerificationPlugin for TlaPlusPlugin {
                 "macos".to_string(),
                 "windows".to_string(),
             ],
-            dependencies: vec![
-                "tlc".to_string(),
-                "java".to_string(),
-            ],
+            dependencies: vec!["tlc".to_string(), "java".to_string()],
         }
     }
 
@@ -207,13 +232,16 @@ impl VerificationPlugin for TlaPlusPlugin {
                 self.tlc_path = Some(PathBuf::from(path));
             }
         }
-        
+
         // Verify tool availability
         let tool_info = self.check_availability()?;
         if !tool_info.available {
-            return Err(anyhow::anyhow!("TLA+ TLC is not available: {}", tool_info.version));
+            return Err(anyhow::anyhow!(
+                "TLA+ TLC is not available: {}",
+                tool_info.version
+            ));
         }
-        
+
         self.initialized = true;
         info!("TLA+ plugin initialized with TLC at: {:?}", self.tlc_path);
         Ok(())

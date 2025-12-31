@@ -1,20 +1,20 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VerificationLevel {
-    Minimal,    // Type safety only
-    Standard,   // + Property-based testing
-    Strict,     // + Session types, refinement types, concurrency testing
-    Formal,     // + Formal specifications
+    Minimal,  // Type safety only
+    Standard, // + Property-based testing
+    Strict,   // + Session types, refinement types, concurrency testing
+    Formal,   // + Formal specifications
 }
 
 impl std::str::FromStr for VerificationLevel {
     type Err = String;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "minimal" => Ok(VerificationLevel::Minimal),
@@ -28,15 +28,15 @@ impl std::str::FromStr for VerificationLevel {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Layer {
-    Formal,         // Layer 1: Formal specifications
-    TypeLevel,      // Layer 2: Type-level verification
-    PropertyBased,  // Layer 3: Property-based testing
-    Monitoring,     // Layer 4: Production monitoring
+    Formal,        // Layer 1: Formal specifications
+    TypeLevel,     // Layer 2: Type-level verification
+    PropertyBased, // Layer 3: Property-based testing
+    Monitoring,    // Layer 4: Production monitoring
 }
 
 impl std::str::FromStr for Layer {
     type Err = String;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "formal" => Ok(Layer::Formal),
@@ -51,9 +51,9 @@ impl std::str::FromStr for Layer {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EnforcementMode {
-    Advisory,   // Log violations, don't fail builds
-    Warning,    // Emit compiler warnings
-    Error,      // Fail compilation/tests
+    Advisory, // Log violations, don't fail builds
+    Warning,  // Emit compiler warnings
+    Error,    // Fail compilation/tests
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

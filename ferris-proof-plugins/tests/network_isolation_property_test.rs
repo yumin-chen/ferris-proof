@@ -1,4 +1,4 @@
-use ferris_proof_plugins::sandbox::{SandboxedExecutor, NetworkPolicy, ResourceLimits};
+use ferris_proof_plugins::sandbox::{NetworkPolicy, ResourceLimits, SandboxedExecutor};
 use proptest::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use tokio::runtime::Runtime;
 
 /// **Feature: ferris-proof, Property 11: Network isolation**
 /// **Validates: Requirements 12.1**
-/// 
+///
 /// For any verification execution without explicit external service consent,
 /// the system should not initiate any network connections to external services.
 #[cfg(test)]
@@ -44,7 +44,7 @@ mod network_isolation_tests {
             )
         ) {
             let rt = Runtime::new().unwrap();
-            
+
             rt.block_on(async {
                 // Create sandboxed executor with network access denied
                 let executor = SandboxedExecutor::new()
@@ -72,7 +72,7 @@ mod network_isolation_tests {
                 match result {
                     Ok(output) => {
                         // If command succeeded, it should not have made external connections
-                        let network_blocked = 
+                        let network_blocked =
                             output.exit_code != 0 || // Command failed
                             output.stderr.contains("Connection refused") ||
                             output.stderr.contains("Network is unreachable") ||
@@ -80,7 +80,7 @@ mod network_isolation_tests {
                             output.stderr.contains("Temporary failure in name resolution") ||
                             output.stderr.contains("No route to host") ||
                             output.stdout.is_empty(); // No successful output
-                        
+
                         prop_assert!(
                             network_blocked,
                             "Network command '{}' should have been blocked or failed, but got exit_code: {}, stdout: '{}', stderr: '{}'",
@@ -93,23 +93,23 @@ mod network_isolation_tests {
                     Err(e) => {
                         // Command was blocked at validation level - this is expected and good
                         let error_msg = e.to_string();
-                        let expected_blocking = 
+                        let expected_blocking =
                             error_msg.contains("not allowed in sandbox") ||
                             error_msg.contains("Network access denied") ||
                             error_msg.contains("Command") && error_msg.contains("not allowed");
-                        
+
                         if !expected_blocking {
                             // If it's not a security-related error, it might be a system issue
                             // (e.g., command not found), which is acceptable
                             prop_assume!(
-                                error_msg.contains("not found") || 
+                                error_msg.contains("not found") ||
                                 error_msg.contains("No such file") ||
                                 error_msg.contains("Failed to spawn process")
                             );
                         }
                     }
                 }
-                
+
                 Ok(())
             })?;
         }
@@ -122,7 +122,7 @@ mod network_isolation_tests {
             command in prop::sample::select(vec!["echo", "true", "false"]), // Safe commands
         ) {
             let rt = Runtime::new().unwrap();
-            
+
             rt.block_on(async {
                 let executor = SandboxedExecutor::new()
                     .with_network_policy(NetworkPolicy::Unrestricted { user_consent })
@@ -161,7 +161,7 @@ mod network_isolation_tests {
                         }
                     }
                 }
-                
+
                 Ok(())
             })?;
         }
@@ -175,7 +175,7 @@ mod network_isolation_tests {
             .with_network_policy(NetworkPolicy::Denied)
             .with_limits(ResourceLimits {
                 max_memory: 50 * 1024 * 1024, // 50MB
-                max_cpu_time: 5, // 5 seconds
+                max_cpu_time: 5,              // 5 seconds
                 max_file_descriptors: 32,
                 max_processes: 1,
                 max_file_size: 1024, // 1KB
@@ -183,25 +183,31 @@ mod network_isolation_tests {
             .with_timeout(Duration::from_secs(3));
 
         // Test that curl is blocked
-        let result = executor.execute(
-            "curl",
-            &["--connect-timeout", "1", "https://httpbin.org/get"],
-            HashMap::new(),
-            None
-        ).await;
+        let result = executor
+            .execute(
+                "curl",
+                &["--connect-timeout", "1", "https://httpbin.org/get"],
+                HashMap::new(),
+                None,
+            )
+            .await;
 
         match result {
             Ok(output) => {
                 // Command executed but should have failed due to network restrictions
-                assert_ne!(output.exit_code, 0, "curl should fail when network is denied");
-                
+                assert_ne!(
+                    output.exit_code, 0,
+                    "curl should fail when network is denied"
+                );
+
                 // Check for network-related error messages
-                let has_network_error = 
-                    output.stderr.contains("Could not resolve host") ||
-                    output.stderr.contains("Connection refused") ||
-                    output.stderr.contains("Network is unreachable") ||
-                    output.stderr.contains("Temporary failure in name resolution");
-                
+                let has_network_error = output.stderr.contains("Could not resolve host")
+                    || output.stderr.contains("Connection refused")
+                    || output.stderr.contains("Network is unreachable")
+                    || output
+                        .stderr
+                        .contains("Temporary failure in name resolution");
+
                 assert!(
                     has_network_error || output.stdout.is_empty(),
                     "Expected network error or empty output, got stdout: '{}', stderr: '{}'",
@@ -213,9 +219,9 @@ mod network_isolation_tests {
                 // Command was blocked at validation level - this is also acceptable
                 let error_msg = e.to_string();
                 assert!(
-                    error_msg.contains("not allowed") || 
-                    error_msg.contains("Network access denied") ||
-                    error_msg.contains("not found"), // curl might not be installed
+                    error_msg.contains("not allowed")
+                        || error_msg.contains("Network access denied")
+                        || error_msg.contains("not found"), // curl might not be installed
                     "Unexpected error: {}",
                     error_msg
                 );
@@ -232,27 +238,22 @@ mod network_isolation_tests {
             .with_timeout(Duration::from_secs(2));
 
         // Test with a command that checks environment variables
-        let result = executor.execute(
-            "env",
-            &[],
-            HashMap::new(),
-            None
-        ).await;
+        let result = executor.execute("env", &[], HashMap::new(), None).await;
 
         if let Ok(output) = result {
             let env_output = output.stdout;
-            
+
             // Check that network-restricting environment variables are set
             assert!(
                 env_output.contains("NO_PROXY=*") || env_output.contains("no_proxy=*"),
                 "Network-restricting environment variables should be set"
             );
-            
+
             // Check that potentially dangerous proxy variables are not set
             assert!(
-                !env_output.contains("HTTP_PROXY=") || 
-                !env_output.contains("HTTPS_PROXY=") ||
-                env_output.contains("NO_PROXY=*"),
+                !env_output.contains("HTTP_PROXY=")
+                    || !env_output.contains("HTTPS_PROXY=")
+                    || env_output.contains("NO_PROXY=*"),
                 "Proxy variables should be cleared or NO_PROXY should be set"
             );
         }

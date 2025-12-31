@@ -59,10 +59,10 @@ stages:
 
 # Base job template for Rust jobs
 .rust_job: &rust_job
-  image: rust:1.75-slim
+  image: rust:1.83-slim
   before_script:
     - apt-get update && apt-get install -y pkg-config libssl-dev
-    - rustup component add rustfmt clippy
+    - rustup show  # This will install the toolchain specified in rust-toolchain.toml
     - export PATH="$CARGO_HOME/bin:$PATH"
   <<: *cargo_cache
 
@@ -223,6 +223,7 @@ coverage:
   stage: test
   before_script:
     - apt-get update && apt-get install -y pkg-config libssl-dev lcov
+    - rustup show
     - rustup component add llvm-tools-preview
     - cargo install cargo-llvm-cov
   script:
@@ -253,7 +254,7 @@ coverage:
 
 # Test report generation
 test_report:
-  image: rust:1.75-slim
+  image: rust:1.83-slim
   stage: property-test
   needs: 
     - test_unit
@@ -263,7 +264,7 @@ test_report:
     - property_test_plugins
   before_script:
     - apt-get update && apt-get install -y pkg-config libssl-dev
-    - rustup component add rustfmt clippy
+    - rustup show
     - export PATH="$CARGO_HOME/bin:$PATH"
     - cargo install cargo-nextest
   cache:
@@ -332,7 +333,7 @@ secret_detection:
     expire_in: 1 week
 
 security_audit:
-  image: rust:1.75-slim
+  image: rust:1.83-slim
   stage: security
   before_script:
     - cargo install cargo-audit
@@ -345,7 +346,7 @@ security_audit:
     - if: $CI_COMMIT_TAG
 
 dependency_check:
-  image: rust:1.75-slim
+  image: rust:1.83-slim
   stage: security
   before_script:
     - rustup toolchain install nightly
@@ -431,11 +432,11 @@ build_linux_musl:
 
 build_macos:
   <<: *build_template
-  image: rust:1.75
+  image: rust:1.83
   variables:
     TARGET: x86_64-apple-darwin
   before_script:
-    - rustup component add rustfmt clippy
+    - rustup show
     - rustup target add $TARGET
   tags:
     - macos

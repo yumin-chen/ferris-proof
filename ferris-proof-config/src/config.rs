@@ -1,4 +1,4 @@
-use ferris_proof_core::{VerificationLevel, EnforcementMode, Technique};
+use ferris_proof_core::{EnforcementMode, Technique, VerificationLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -107,9 +107,9 @@ pub struct Thresholds {
 impl Default for Thresholds {
     fn default() -> Self {
         Self {
-            max_verification_time: 300, // 5 minutes
+            max_verification_time: 300,               // 5 minutes
             max_memory_usage: 2 * 1024 * 1024 * 1024, // 2GB
-            cache_ttl: 24 * 60 * 60, // 24 hours
+            cache_ttl: 24 * 60 * 60,                  // 24 hours
         }
     }
 }
@@ -137,10 +137,7 @@ impl Default for Config {
             profile: ProfileConfig {
                 level: VerificationLevel::Standard,
                 enforcement: EnforcementMode::Warning,
-                enabled_techniques: vec![
-                    Technique::TypeSafety,
-                    Technique::PropertyTests,
-                ],
+                enabled_techniques: vec![Technique::TypeSafety, Technique::PropertyTests],
             },
             tools: ToolConfig {
                 tla_plus: None,
@@ -158,9 +155,9 @@ impl Default for Config {
                 generate_reports: true,
             },
             thresholds: Thresholds {
-                max_verification_time: 300, // 5 minutes
+                max_verification_time: 300,               // 5 minutes
                 max_memory_usage: 2 * 1024 * 1024 * 1024, // 2GB
-                cache_ttl: 24 * 60 * 60, // 24 hours
+                cache_ttl: 24 * 60 * 60,                  // 24 hours
             },
             ci: CiConfig {
                 fail_on_violations: true,

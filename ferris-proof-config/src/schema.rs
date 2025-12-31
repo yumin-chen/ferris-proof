@@ -1,6 +1,6 @@
-use anyhow::{Result, anyhow, bail};
-use serde_json::{Value, json};
+use anyhow::{anyhow, bail, Result};
 use jsonschema::{JSONSchema, ValidationError};
+use serde_json::{json, Value};
 use tracing::debug;
 
 pub struct SchemaValidator {
@@ -21,7 +21,7 @@ impl SchemaValidator {
     pub fn new() -> Result<Self> {
         let config_schema = Self::build_config_schema()?;
         let module_schema = Self::build_module_schema()?;
-        
+
         Ok(Self {
             config_schema,
             module_schema,
@@ -31,7 +31,7 @@ impl SchemaValidator {
     /// Validate a root configuration file
     pub fn validate(&self, config: &Value) -> Result<()> {
         debug!("Validating configuration against schema");
-        
+
         match self.config_schema.validate(config) {
             Ok(_) => {
                 debug!("Configuration schema validation passed");
@@ -42,8 +42,11 @@ impl SchemaValidator {
                     .into_iter()
                     .map(|e| format!("{:?} at {}", e.kind, e.instance_path))
                     .collect();
-                
-                bail!("Configuration validation failed:\n{}", error_messages.join("\n"));
+
+                bail!(
+                    "Configuration validation failed:\n{}",
+                    error_messages.join("\n")
+                );
             }
         }
     }
@@ -51,7 +54,7 @@ impl SchemaValidator {
     /// Validate a module configuration (partial config)
     pub fn validate_module(&self, config: &Value) -> Result<()> {
         debug!("Validating module configuration against schema");
-        
+
         match self.module_schema.validate(config) {
             Ok(_) => {
                 debug!("Module configuration schema validation passed");
@@ -62,8 +65,11 @@ impl SchemaValidator {
                     .into_iter()
                     .map(|e| format!("{:?} at {}", e.kind, e.instance_path))
                     .collect();
-                
-                bail!("Module configuration validation failed:\n{}", error_messages.join("\n"));
+
+                bail!(
+                    "Module configuration validation failed:\n{}",
+                    error_messages.join("\n")
+                );
             }
         }
     }
@@ -83,15 +89,19 @@ impl SchemaValidator {
             for error in errors {
                 let location = error.instance_path.to_string();
                 let message = format!("{:?}", error.kind);
-                
+
                 let validation_error = ValidationErrorDetail {
-                    field: if location.is_empty() { "root".to_string() } else { location.clone() },
+                    field: if location.is_empty() {
+                        "root".to_string()
+                    } else {
+                        location.clone()
+                    },
                     message,
                     location: location.clone(),
                     expected_value: self.get_expected_value_for_field(&location),
                     suggestion: self.get_suggestion_for_field(&location, &error),
                 };
-                
+
                 result.errors.push(validation_error);
             }
         }
@@ -106,8 +116,14 @@ impl SchemaValidator {
     fn validate_business_logic(&self, config: &Value, result: &mut ValidationResult) {
         // Check verification level vs enabled techniques
         if let (Some(level), Some(techniques)) = (
-            config.get("profile").and_then(|p| p.get("level")).and_then(|l| l.as_str()),
-            config.get("profile").and_then(|p| p.get("enabled_techniques")).and_then(|t| t.as_array()),
+            config
+                .get("profile")
+                .and_then(|p| p.get("level"))
+                .and_then(|l| l.as_str()),
+            config
+                .get("profile")
+                .and_then(|p| p.get("enabled_techniques"))
+                .and_then(|t| t.as_array()),
         ) {
             self.validate_level_techniques_consistency(level, techniques, result);
         }
@@ -123,7 +139,12 @@ impl SchemaValidator {
         }
     }
 
-    fn validate_level_techniques_consistency(&self, level: &str, techniques: &[Value], result: &mut ValidationResult) {
+    fn validate_level_techniques_consistency(
+        &self,
+        level: &str,
+        techniques: &[Value],
+        result: &mut ValidationResult,
+    ) {
         let techniques_vec: Vec<String> = techniques
             .iter()
             .filter_map(|t| t.as_str().map(|s| s.to_string()))
@@ -192,14 +213,19 @@ impl SchemaValidator {
     }
 
     fn validate_thresholds(&self, thresholds: &Value, result: &mut ValidationResult) {
-        if let Some(max_time) = thresholds.get("max_verification_time").and_then(|t| t.as_u64()) {
+        if let Some(max_time) = thresholds
+            .get("max_verification_time")
+            .and_then(|t| t.as_u64())
+        {
             if max_time == 0 {
                 result.errors.push(ValidationErrorDetail {
                     field: "thresholds.max_verification_time".to_string(),
                     message: "max_verification_time must be > 0".to_string(),
                     location: "thresholds.max_verification_time".to_string(),
                     expected_value: Some("positive integer".to_string()),
-                    suggestion: Some("Set to at least 60 seconds for basic verification".to_string()),
+                    suggestion: Some(
+                        "Set to at least 60 seconds for basic verification".to_string(),
+                    ),
                 });
                 result.is_valid = false;
             }
@@ -208,7 +234,9 @@ impl SchemaValidator {
                     field: "thresholds.max_verification_time".to_string(),
                     message: "max_verification_time is very high (> 1 hour)".to_string(),
                     location: "thresholds.max_verification_time".to_string(),
-                    suggestion: Some("Consider using a shorter timeout for faster feedback".to_string()),
+                    suggestion: Some(
+                        "Consider using a shorter timeout for faster feedback".to_string(),
+                    ),
                 });
             }
         }
@@ -220,7 +248,9 @@ impl SchemaValidator {
                     message: "max_memory_usage must be > 0".to_string(),
                     location: "thresholds.max_memory_usage".to_string(),
                     expected_value: Some("positive integer (bytes)".to_string()),
-                    suggestion: Some("Set to at least 1073741824 (1GB) for basic verification".to_string()),
+                    suggestion: Some(
+                        "Set to at least 1073741824 (1GB) for basic verification".to_string(),
+                    ),
                 });
                 result.is_valid = false;
             }
@@ -236,7 +266,9 @@ impl SchemaValidator {
                         message: "proptest.cases must be > 0".to_string(),
                         location: "tools.proptest.cases".to_string(),
                         expected_value: Some("positive integer".to_string()),
-                        suggestion: Some("Set to at least 100 test cases for reasonable coverage".to_string()),
+                        suggestion: Some(
+                            "Set to at least 100 test cases for reasonable coverage".to_string(),
+                        ),
                     });
                     result.is_valid = false;
                 }
@@ -245,7 +277,9 @@ impl SchemaValidator {
                         field: "tools.proptest.cases".to_string(),
                         message: "proptest.cases is very high (>100k)".to_string(),
                         location: "tools.proptest.cases".to_string(),
-                        suggestion: Some("Consider reducing cases for faster test execution".to_string()),
+                        suggestion: Some(
+                            "Consider reducing cases for faster test execution".to_string(),
+                        ),
                     });
                 }
             }

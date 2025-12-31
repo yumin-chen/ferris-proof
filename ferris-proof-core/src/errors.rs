@@ -5,36 +5,36 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum FerrisProofError {
     #[error("Configuration error: {message}")]
-    Configuration { 
-        message: String, 
+    Configuration {
+        message: String,
         location: Option<Location>,
         suggestions: Vec<String>,
     },
-    
+
     #[error("Tool error: {tool} - {message}")]
-    Tool { 
-        tool: String, 
+    Tool {
+        tool: String,
         message: String,
         exit_code: Option<i32>,
         stderr: Option<String>,
     },
-    
+
     #[error("Verification failed: {violations_count} violation(s)")]
-    Verification { 
+    Verification {
         violations: Vec<Violation>,
         violations_count: usize,
     },
-    
+
     #[error("IO error: {message}")]
-    Io { 
-        message: String, 
+    Io {
+        message: String,
         path: Option<PathBuf>,
         #[source]
         source: std::io::Error,
     },
-    
+
     #[error("Parse error: {message}")]
-    Parse { 
+    Parse {
         message: String,
         location: Location,
         expected: Option<String>,
@@ -51,7 +51,7 @@ impl FerrisProofError {
             Self::Parse { .. } => "FP-PS-001",
         }
     }
-    
+
     pub fn explanation(&self) -> String {
         match self.code() {
             "FP-CF-001" => "Invalid configuration detected. Check your ferrisproof.toml file for syntax errors or invalid values.".to_string(),

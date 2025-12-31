@@ -312,8 +312,9 @@ ferris-proof/
 
 ### Prerequisites
 
-- **Rust 1.70+** (latest stable recommended)
+- **Rust 1.83+** (specified in `rust-toolchain.toml`)
 - **Git** for version control
+- **pkg-config** and **libssl-dev** (Linux) or **openssl** (macOS) for SSL support
 
 ### Optional Tools (for full verification)
 

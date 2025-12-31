@@ -2,7 +2,6 @@
 // This test validates Requirements 2.2, 2.3, 2.4, 2.5 without depending on ferris-proof-core
 
 use proptest::prelude::*;
-use std::collections::HashMap;
 
 // Standalone enums for testing (mirroring the core types)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,7 +52,7 @@ struct TestProjectStructure {
 /// Simulate configuration merging logic
 fn merge_configs(base: TestConfig, override_config: TestConfig) -> TestConfig {
     TestConfig {
-        level: override_config.level, // Override takes precedence
+        level: override_config.level,             // Override takes precedence
         enforcement: override_config.enforcement, // Override takes precedence
         enabled_techniques: if override_config.enabled_techniques.is_empty() {
             base.enabled_techniques
@@ -66,7 +65,7 @@ fn merge_configs(base: TestConfig, override_config: TestConfig) -> TestConfig {
 /// Simulate configuration discovery and merging for a file path
 fn resolve_config_for_path(project: &TestProjectStructure, file_path: &str) -> TestConfig {
     let mut config = project.root_config.clone();
-    
+
     // Apply module configs in order (simulating directory hierarchy)
     for module_config in &project.module_configs {
         // Simple path matching - if file path starts with module path, apply config
@@ -74,7 +73,7 @@ fn resolve_config_for_path(project: &TestProjectStructure, file_path: &str) -> T
             config = merge_configs(config, module_config.config.clone());
         }
     }
-    
+
     config
 }
 
@@ -82,14 +81,9 @@ fn resolve_config_for_path(project: &TestProjectStructure, file_path: &str) -> T
 fn get_techniques_for_level(level: VerificationLevel) -> Vec<Technique> {
     match level {
         // Requirement 2.2: minimal level enables only type safety and basic tests
-        VerificationLevel::Minimal => vec![
-            Technique::TypeSafety,
-        ],
+        VerificationLevel::Minimal => vec![Technique::TypeSafety],
         // Requirement 2.3: standard level enables type safety, basic tests, and property-based testing
-        VerificationLevel::Standard => vec![
-            Technique::TypeSafety,
-            Technique::PropertyTests,
-        ],
+        VerificationLevel::Standard => vec![Technique::TypeSafety, Technique::PropertyTests],
         // Requirement 2.4: strict level enables session types, refinement types, and concurrency testing
         VerificationLevel::Strict => vec![
             Technique::TypeSafety,
@@ -274,35 +268,41 @@ mod unit_tests {
     #[test]
     fn test_standard_level_techniques() {
         let techniques = get_techniques_for_level(VerificationLevel::Standard);
-        assert_eq!(techniques, vec![
-            Technique::TypeSafety,
-            Technique::PropertyTests,
-        ]);
+        assert_eq!(
+            techniques,
+            vec![Technique::TypeSafety, Technique::PropertyTests,]
+        );
     }
 
     #[test]
     fn test_strict_level_techniques() {
         let techniques = get_techniques_for_level(VerificationLevel::Strict);
-        assert_eq!(techniques, vec![
-            Technique::TypeSafety,
-            Technique::PropertyTests,
-            Technique::SessionTypes,
-            Technique::RefinementTypes,
-            Technique::ConcurrencyTesting,
-        ]);
+        assert_eq!(
+            techniques,
+            vec![
+                Technique::TypeSafety,
+                Technique::PropertyTests,
+                Technique::SessionTypes,
+                Technique::RefinementTypes,
+                Technique::ConcurrencyTesting,
+            ]
+        );
     }
 
     #[test]
     fn test_formal_level_techniques() {
         let techniques = get_techniques_for_level(VerificationLevel::Formal);
-        assert_eq!(techniques, vec![
-            Technique::TypeSafety,
-            Technique::PropertyTests,
-            Technique::SessionTypes,
-            Technique::RefinementTypes,
-            Technique::ConcurrencyTesting,
-            Technique::FormalSpecs,
-            Technique::ModelChecking,
-        ]);
+        assert_eq!(
+            techniques,
+            vec![
+                Technique::TypeSafety,
+                Technique::PropertyTests,
+                Technique::SessionTypes,
+                Technique::RefinementTypes,
+                Technique::ConcurrencyTesting,
+                Technique::FormalSpecs,
+                Technique::ModelChecking,
+            ]
+        );
     }
 }

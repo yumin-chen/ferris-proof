@@ -1,11 +1,10 @@
 use proptest::prelude::*;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-use tempfile::TempDir;
+use std::path::Path;
 
 /// **Feature: ferris-proof, Property 1: Project structure consistency**
 /// **Validates: Requirements 18.3**
-/// 
+///
 /// This property test verifies that FerrisProof maintains consistent project structure
 /// across different initialization scenarios and configurations.
 #[cfg(test)]
@@ -35,11 +34,12 @@ mod project_structure_tests {
             required_directories.insert(".github".to_string());
             required_directories.insert("docs".to_string());
 
-            let mut crate_structure = Vec::new();
-            crate_structure.push("ferris-proof-cli".to_string());
-            crate_structure.push("ferris-proof-core".to_string());
-            crate_structure.push("ferris-proof-config".to_string());
-            crate_structure.push("ferris-proof-plugins".to_string());
+            let crate_structure = vec![
+                "ferris-proof-cli".to_string(),
+                "ferris-proof-core".to_string(),
+                "ferris-proof-config".to_string(),
+                "ferris-proof-plugins".to_string(),
+            ];
 
             Self {
                 root_files,
@@ -95,7 +95,7 @@ mod project_structure_tests {
                 if crate_name == "ferris-proof-cli" {
                     let main_rs = src_dir.join("main.rs");
                     if !main_rs.exists() && !lib_rs.exists() {
-                        return Err(format!("CLI crate missing main.rs or lib.rs"));
+                        return Err("CLI crate missing main.rs or lib.rs".to_string());
                     }
                 } else if !lib_rs.exists() {
                     return Err(format!("Crate {} missing lib.rs", crate_name));
@@ -117,11 +117,11 @@ mod project_structure_tests {
             _include_examples in prop::bool::ANY,
         ) {
             let expected_structure = ProjectStructure::ferris_proof_workspace();
-            
+
             // Find the workspace root by looking for Cargo.toml with [workspace]
             let mut current_dir = std::env::current_dir()
                 .expect("Failed to get current directory");
-            
+
             // Walk up the directory tree to find workspace root
             loop {
                 let cargo_toml = current_dir.join("Cargo.toml");
@@ -132,31 +132,31 @@ mod project_structure_tests {
                         }
                     }
                 }
-                
+
                 if let Some(parent) = current_dir.parent() {
                     current_dir = parent.to_path_buf();
                 } else {
                     prop_assume!(false); // Skip test if can't find workspace root
                 }
             }
-            
+
             // Validate the current project structure
             let validation_result = expected_structure.validate_structure(&current_dir);
-            
+
             prop_assert!(
                 validation_result.is_ok(),
                 "Project structure validation failed: {}",
                 validation_result.unwrap_err()
             );
-            
+
             // Additional consistency checks
-            
+
             // 1. Workspace Cargo.toml should list all crates
             let workspace_cargo = current_dir.join("Cargo.toml");
             if workspace_cargo.exists() {
                 let cargo_content = std::fs::read_to_string(&workspace_cargo)
                     .expect("Failed to read workspace Cargo.toml");
-                
+
                 for crate_name in &expected_structure.crate_structure {
                     prop_assert!(
                         cargo_content.contains(&format!("\"{}\"", crate_name)),
@@ -165,14 +165,14 @@ mod project_structure_tests {
                     );
                 }
             }
-            
+
             // 2. Each crate should have consistent naming
             for crate_name in &expected_structure.crate_structure {
                 let crate_cargo = current_dir.join(crate_name).join("Cargo.toml");
                 if crate_cargo.exists() {
                     let cargo_content = std::fs::read_to_string(&crate_cargo)
                         .expect("Failed to read crate Cargo.toml");
-                    
+
                     prop_assert!(
                         cargo_content.contains(&format!("name = \"{}\"", crate_name)),
                         "Crate {} has inconsistent name in Cargo.toml",
@@ -180,7 +180,7 @@ mod project_structure_tests {
                     );
                 }
             }
-            
+
             // 3. Documentation structure should be consistent
             let docs_dir = current_dir.join("docs");
             if docs_dir.exists() {
@@ -202,11 +202,11 @@ mod project_structure_tests {
             crate_index in 0..4usize, // We have 4 crates
         ) {
             let expected_structure = ProjectStructure::ferris_proof_workspace();
-            
+
             // Find the workspace root by looking for Cargo.toml with [workspace]
             let mut current_dir = std::env::current_dir()
                 .expect("Failed to get current directory");
-            
+
             // Walk up the directory tree to find workspace root
             loop {
                 let cargo_toml = current_dir.join("Cargo.toml");
@@ -217,33 +217,33 @@ mod project_structure_tests {
                         }
                     }
                 }
-                
+
                 if let Some(parent) = current_dir.parent() {
                     current_dir = parent.to_path_buf();
                 } else {
                     prop_assume!(false); // Skip test if can't find workspace root
                 }
             }
-            
+
             if crate_index >= expected_structure.crate_structure.len() {
                 return Ok(());
             }
-            
+
             let crate_name = &expected_structure.crate_structure[crate_index];
             let crate_cargo = current_dir.join(crate_name).join("Cargo.toml");
-            
+
             if !crate_cargo.exists() {
                 return Ok(());
             }
-            
+
             let cargo_content = std::fs::read_to_string(&crate_cargo)
                 .expect("Failed to read crate Cargo.toml");
-            
+
             // Check that workspace dependencies are used consistently
             if cargo_content.contains("[dependencies]") {
                 // If crate uses workspace dependencies, they should use .workspace = true
                 let workspace_deps = ["serde", "tokio", "anyhow", "thiserror", "tracing"];
-                
+
                 for dep in &workspace_deps {
                     if cargo_content.contains(&format!("{}.workspace", dep)) {
                         prop_assert!(
@@ -255,7 +255,7 @@ mod project_structure_tests {
                     }
                 }
             }
-            
+
             // Check internal dependencies use path references
             for other_crate in &expected_structure.crate_structure {
                 if other_crate != crate_name && cargo_content.contains(other_crate) {
@@ -273,11 +273,10 @@ mod project_structure_tests {
     #[test]
     fn test_current_project_structure() {
         let expected_structure = ProjectStructure::ferris_proof_workspace();
-        
+
         // Find the workspace root by looking for Cargo.toml with [workspace]
-        let mut current_dir = std::env::current_dir()
-            .expect("Failed to get current directory");
-        
+        let mut current_dir = std::env::current_dir().expect("Failed to get current directory");
+
         // Walk up the directory tree to find workspace root
         loop {
             let cargo_toml = current_dir.join("Cargo.toml");
@@ -288,14 +287,14 @@ mod project_structure_tests {
                     }
                 }
             }
-            
+
             if let Some(parent) = current_dir.parent() {
                 current_dir = parent.to_path_buf();
             } else {
                 panic!("Could not find workspace root");
             }
         }
-        
+
         match expected_structure.validate_structure(&current_dir) {
             Ok(()) => println!("✓ Project structure validation passed"),
             Err(e) => panic!("Project structure validation failed: {}", e),
