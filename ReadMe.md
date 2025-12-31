@@ -4,20 +4,61 @@
 
 FerrisProof is a **full-stack correctness pipeline** for Rust applications, combining **formal modeling (TLA+, Alloy)**, **Rust's type system**, and **property-based testing** to ensure your systems are **memory-safe, structurally sound, and functionally correct**.
 
+[![Coverage](https://codecov.io/gh/yumin-chen/ferris-proof/branch/main/graph/badge.svg)](https://codecov.io/gh/yumin-chen/ferris-proof)
+[![License: CC0-1.0](https://img.shields.io/badge/License-CC0%201.0-lightgrey.svg)](http://creativecommons.org/publicdomain/zero/1.0/)
+
+> **⚠️ Early Development**: FerrisProof is currently in active development. Core infrastructure is complete, but verification features are still being implemented.
+
+Multi-layer correctness pipeline for Rust applications that combines formal modeling, type-level verification, and property-based testing to ensure systems are memory-safe, structurally sound, and functionally correct.
+
 ---
 
 ## Features
 
-* **Multi-Layer Verification Architecture**: Four progressive verification layers with configurable enforcement
-* **Formal Behavioral Modeling**: TLA+ for temporal properties, safety, and concurrency correctness
-* **Structural Invariants**: Alloy models define and validate data constraints
-* **Type-Level Verification**: Session types and refinement types for compile-time guarantees  
-* **Property-Based Testing**: `proptest` ensures correctness across a wide range of inputs
-* **Hierarchical Configuration**: Granular control with module-level and item-level overrides
-* **Runtime Monitoring**: Optional assertions and logging to enforce invariants during execution
-* **Traceability**: From formal models → Rust implementation → tests → runtime logs
-* **CI/CD Integration**: Comprehensive reporting and build integration
-* **Progressive Adoption**: Gradual verification level upgrades with migration assistance
+- **Multi-Layer Verification**: Four progressive verification layers targeting different classes of errors
+- **Formal Specifications**: TLA+ and Alloy integration for protocol-level correctness
+- **Type-Level Verification**: Session types and refinement types for compile-time guarantees
+- **Property-Based Testing**: Comprehensive property testing with proptest integration
+- **Production Monitoring**: Runtime assertions and observability hooks
+- **Progressive Adoption**: Gradual verification level upgrades with automated scaffolding
+- **CI/CD Integration**: GitHub Actions support with configurable enforcement modes
+- **Hierarchical Configuration**: Module-level and item-level verification overrides
+- **Comprehensive Caching**: Content-addressed verification result caching
+- **Security-First**: Sandboxed execution and local-only verification options
+
+## Quick Start
+
+### Installation
+
+```bash
+# Install from source (crates.io release coming soon)
+git clone https://github.com/yumin-chen/ferris-proof.git
+cd ferris-proof
+cargo install --path ferris-proof-cli
+```
+
+### Initialise a Project
+
+```bash
+# Initialise with standard verification level
+ferris-proof init --level standard
+
+# Interactive setup
+ferris-proof init --interactive
+```
+
+### Run Verification
+
+```bash
+# Check all verification requirements
+ferris-proof check
+
+# Check specific module
+ferris-proof check --module consensus
+
+# Auto-fix violations where possible
+ferris-proof check --fix
+```
 
 ---
 
@@ -122,72 +163,106 @@ graph TD
 
 ```
 ferris-proof/
-├── Cargo.toml                    # Rust package file
-├── src/                         # Rust implementation
-├── models/                      # TLA+ & Alloy formal models
-├── tests/                       # Property-based and integration tests
-├── scripts/                     # Automation scripts
+├── ferris-proof-cli/             # Command-line interface
+├── ferris-proof-core/            # Core verification engine
+├── ferris-proof-config/          # Configuration management
+├── ferris-proof-plugins/         # Plugin system and tool integrations
 ├── docs/                         # Documentation
 │   ├── ferris-proof.tsd.specs.md # Detailed architecture design
 │   └── ferris-proof.prd.specs.md # Functional requirements
-├── ferrisproof.toml            # Root configuration
-└── ReadMe.md
+├── Cargo.toml                    # Workspace configuration
+├── ReadMe.md                     # This file
+├── Contributing.md               # Contribution guidelines
+├── Licence.md                       # CC0 1.0 Universal licence
+└── Dockerfile                    # Container build
+├── .github/                      # GitHub Actions workflows
 ```
 
 ---
 
+## Development Status
+
+### ✅ Completed
+- **Core Infrastructure**: Rust workspace with 4 crates
+- **CI/CD Pipeline**: GitHub Actions with multi-platform testing
+- **Configuration System**: Hierarchical TOML configuration
+- **Plugin Architecture**: Extensible verification tool integration
+- **Property-Based Testing**: Framework for correctness validation
+- **Documentation**: Comprehensive specs and getting-started guides
+- **Security**: Sandboxed execution and input validation
+
+### 🚧 In Progress
+- **Configuration Management**: File discovery and merging
+- **CLI Commands**: Project initialization and verification
+- **Verification Engine**: Core orchestration logic
+- **Cache System**: Content-addressed result caching
+
+### 📋 Planned
+- **Formal Specification Integration**: TLA+ and Alloy support
+- **Type-Level Verification**: Session types and refinement types
+- **Production Monitoring**: Runtime assertions and observability
+- **Tool Integrations**: TLC, Alloy Analyzer, Kani, Loom
+
 ## Setup & Installation
 
-1. **Clone the repository**:
+### Prerequisites
+
+- **Rust 1.70+** (latest stable recommended)
+- **Git** for version control
+
+### Optional Tools (for full verification)
+
+- **TLA+ Toolbox**: [Download here](https://lamport.azurewebsites.net/tla/tools.html)
+- **Alloy Analyzer**: [Download here](http://alloytools.org/)
+
+### Build from Source
 
 ```bash
+# Clone the repository
 git clone https://github.com/yumin-chen/ferris-proof.git
 cd ferris-proof
-```
 
-2. **Install Rust** (if not installed):
-   [https://www.rust-lang.org/tools/install](https://www.rust-lang.org/tools/install)
+# Build all crates
+cargo build --all-features
 
-3. **Install TLA+ tools**:
-   Download [TLA+ Toolbox](https://lamport.azurewebsites.net/tla/tools.html)
+# Run tests
+cargo test --all-features
 
-4. **Install Alloy Analyzer**:
-   [http://alloytools.org/](http://alloytools.org/)
+# Run property-based tests
+cargo test --all-features -- --ignored
 
-5. **Install dependencies and run tests**:
-
-```bash
-cargo build
-cargo test
-```
-
-6. **Initialize project with verification configuration**:
-
-```bash
-cargo run -- init --level standard
-```
-
-7. **Run verification checks**:
-
-```bash
-cargo run -- check
-```
-
-8. **Run property-based tests**:
-
-```bash
-cargo test --test property_tests
-```
-
-9. **Run integration tests**:
-
-```bash
-cargo test --test integration_tests
+# Install CLI tool
+cargo install --path ferris-proof-cli
 ```
 
 ---
 
 ## Configuration
+
+Create a `ferrisproof.toml` file in your project root:
+
+```toml
+[profile]
+level = "standard"
+enforcement = "warning"
+enabled_techniques = ["TypeSafety", "PropertyTests"]
+
+[tools.proptest]
+cases = 1000
+max_shrink_iters = 10000
+
+[features]
+cache_enabled = true
+parallel_execution = true
+generate_reports = true
+
+[thresholds]
+max_verification_time = 300  # 5 minutes
+max_memory_usage = 2147483648  # 2GB
+cache_ttl = 86400  # 24 hours
+```
+
+### Configuration Hierarchy
 
 FerrisProof uses hierarchical TOML configuration with the following precedence (highest to lowest):
 
@@ -195,29 +270,6 @@ FerrisProof uses hierarchical TOML configuration with the following precedence (
 2. **Module-level glob patterns** (most specific path match)
 3. **Module configuration files** (nearest ancestor directory)
 4. **Root configuration** (`ferrisproof.toml`)
-
-### Example Configuration
-
-```toml
-# ferrisproof.toml
-[profile]
-level = "standard"
-enforcement = "error"
-
-[tools]
-tlaplus = { version = "^1.8", timeout = "300s" }
-alloy = { version = "^6.0", memory = "4G" }
-
-[modules]
-"consensus::*" = { level = "formal" }
-"api::public::*" = { level = "strict" }
-"utils::*" = { level = "minimal" }
-
-[features]
-property_tests = true
-session_types = true
-refinement_types = false
-```
 
 ---
 
@@ -284,7 +336,7 @@ FerrisProof provides structured error handling with:
 
 ## Workflow Examples
 
-### Project Initialization
+### Project Initialisation
 
 ```mermaid
 sequenceDiagram
@@ -336,10 +388,15 @@ sequenceDiagram
 ```
 
 ---
-
 ## Documentation
 
-For detailed information, see:
+- [Getting Started Guide](docs/getting-started.md)
+- [Configuration Reference](docs/configuration.md)
+- [Verification Levels](docs/verification-levels.md)
+- [Tool Integration](docs/tool-integration.md)
+- [API Documentation](https://docs.rs/ferris-proof)
+
+For detailed technical information:
 
 - **[Design Document](docs/ferris-proof.tsd.specs.md)** - Comprehensive architecture and implementation details
 - **[Requirements Document](docs/ferris-proof.prd.specs.md)** - Functional requirements and acceptance criteria
@@ -359,14 +416,10 @@ For detailed information, see:
 
 ## Contributing
 
-FerrisProof welcomes contributions!
+We welcome contributions! Please see [Contributing.md](Contributing.md) for guidelines.
 
----
+## Licence
 
-## Acknowledgments
+This work is dedicated to the public domain under the [CC0 1.0 Universal](Licence.md) license.
 
-- **TLA+ Community** for formal methods inspiration
-- **Rust Community** for excellent type system and tooling
-- **Property-based Testing** pioneers for universal verification approach
-
----
+To the extent possible under law, the contributors have waived all copyright and related or neighbouring rights to this work.
