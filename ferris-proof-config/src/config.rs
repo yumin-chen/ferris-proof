@@ -6,10 +6,15 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub profile: ProfileConfig,
+    #[serde(default)]
     pub tools: ToolConfig,
+    #[serde(default)]
     pub modules: HashMap<String, ModuleConfig>,
+    #[serde(default)]
     pub features: FeatureConfig,
+    #[serde(default)]
     pub thresholds: Thresholds,
+    #[serde(default)]
     pub ci: CiConfig,
 }
 
@@ -26,6 +31,20 @@ pub struct ToolConfig {
     pub alloy: Option<AlloyConfig>,
     pub proptest: Option<ProptestConfig>,
     pub kani: Option<KaniConfig>,
+}
+
+impl Default for ToolConfig {
+    fn default() -> Self {
+        Self {
+            tla_plus: None,
+            alloy: None,
+            proptest: Some(ProptestConfig {
+                cases: Some(1000),
+                max_shrink_iters: Some(10000),
+            }),
+            kani: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,6 +87,16 @@ pub struct FeatureConfig {
     pub generate_reports: bool,
 }
 
+impl Default for FeatureConfig {
+    fn default() -> Self {
+        Self {
+            cache_enabled: true,
+            parallel_execution: true,
+            generate_reports: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Thresholds {
     pub max_verification_time: u64,
@@ -75,11 +104,31 @@ pub struct Thresholds {
     pub cache_ttl: u64,
 }
 
+impl Default for Thresholds {
+    fn default() -> Self {
+        Self {
+            max_verification_time: 300, // 5 minutes
+            max_memory_usage: 2 * 1024 * 1024 * 1024, // 2GB
+            cache_ttl: 24 * 60 * 60, // 24 hours
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CiConfig {
     pub fail_on_violations: bool,
     pub generate_artifacts: bool,
     pub upload_reports: bool,
+}
+
+impl Default for CiConfig {
+    fn default() -> Self {
+        Self {
+            fail_on_violations: true,
+            generate_artifacts: true,
+            upload_reports: false,
+        }
+    }
 }
 
 impl Default for Config {

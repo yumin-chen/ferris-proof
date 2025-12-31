@@ -318,7 +318,8 @@ impl SchemaValidator {
                         "kani": {
                             "$ref": "#/definitions/KaniConfig"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "modules": {
                     "type": "object",
@@ -326,7 +327,8 @@ impl SchemaValidator {
                         "^.*$": {
                             "$ref": "#/definitions/ModuleConfig"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "features": {
                     "$ref": "#/definitions/FeatureConfig"
@@ -338,7 +340,7 @@ impl SchemaValidator {
                     "$ref": "#/definitions/CiConfig"
                 }
             },
-            "required": ["profile", "tools", "modules", "features", "thresholds", "ci"],
+            "required": ["profile"],
             "additionalProperties": false,
             "definitions": {
                 "TlaPlusConfig": {
@@ -358,7 +360,8 @@ impl SchemaValidator {
                             "minimum": 1,
                             "description": "Number of parallel workers for model checking"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "AlloyConfig": {
                     "type": "object",
@@ -372,7 +375,8 @@ impl SchemaValidator {
                             "minimum": 1,
                             "description": "Scope for Alloy analysis"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "ProptestConfig": {
                     "type": "object",
@@ -387,7 +391,8 @@ impl SchemaValidator {
                             "minimum": 1,
                             "description": "Maximum iterations for test case shrinking"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "KaniConfig": {
                     "type": "object",
@@ -401,7 +406,8 @@ impl SchemaValidator {
                             "minimum": 1,
                             "description": "Unwind depth for Kani verification"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "ModuleConfig": {
                     "type": "object",
@@ -424,7 +430,8 @@ impl SchemaValidator {
                             "type": "string",
                             "description": "Path to formal specification file"
                         }
-                    }
+                    },
+                    "additionalProperties": false
                 },
                 "FeatureConfig": {
                     "type": "object",

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum VerificationLevel {
     Minimal,    // Type safety only
     Standard,   // + Property-based testing
@@ -48,6 +49,7 @@ impl std::str::FromStr for Layer {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum EnforcementMode {
     Advisory,   // Log violations, don't fail builds
     Warning,    // Emit compiler warnings
@@ -55,6 +57,7 @@ pub enum EnforcementMode {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub enum Technique {
     TypeSafety,
     PropertyTests,

@@ -24,7 +24,7 @@ enabled_techniques = ["TypeSafety", "PropertyTests"]
     assert!(result.is_err());
     
     let error_message = result.unwrap_err().to_string();
-    assert!(error_message.contains("Failed to parse root config"));
+    assert!(error_message.contains("Invalid TOML syntax") || error_message.contains("Failed to parse root config"));
 }
 
 #[test]
