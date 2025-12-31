@@ -7,24 +7,73 @@ FerrisProof is a **full-stack correctness pipeline** for Rust applications, comb
 [![Coverage](https://codecov.io/gh/yumin-chen/ferris-proof/branch/main/graph/badge.svg)](https://codecov.io/gh/yumin-chen/ferris-proof)
 [![License: CC0-1.0](https://img.shields.io/badge/License-CC0%201.0-lightgrey.svg)](http://creativecommons.org/publicdomain/zero/1.0/)
 
-> **⚠️ Early Development**: FerrisProof is currently in active development. Core infrastructure is complete, but verification features are still being implemented.
+> **🚧 Active Development**: FerrisProof is currently in active development. Core infrastructure and CLI tools are complete, with verification layers being progressively implemented.
 
 Multi-layer correctness pipeline for Rust applications that combines formal modeling, type-level verification, and property-based testing to ensure systems are memory-safe, structurally sound, and functionally correct.
 
 ---
 
+## Quick Start
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yumin-chen/ferris-proof.git
+cd ferris-proof
+
+# Build and install the CLI tool
+cargo install --path ferris-proof-cli
+```
+
+### Initialise a New Project
+
+```bash
+# Initialise with standard verification level
+ferris-proof init --level standard
+
+# Interactive initialization with prompts
+ferris-proof init --interactive
+
+# Initialise with formal verification level
+ferris-proof init --level formal
+```
+
+### Basic Commands
+
+```bash
+# Show project configuration
+ferris-proof config
+
+# Validate configuration
+ferris-proof config --validate
+
+# Show configuration for specific file
+ferris-proof config --file src/main.rs
+
+# Explain error codes
+ferris-proof explain FP-CF-001
+
+# Get help
+ferris-proof --help
+ferris-proof init --help
+```
+
+---
+
 ## Features
 
-- **Multi-Layer Verification**: Four progressive verification layers targeting different classes of errors
-- **Formal Specifications**: TLA+ and Alloy integration for protocol-level correctness
-- **Type-Level Verification**: Session types and refinement types for compile-time guarantees
-- **Property-Based Testing**: Comprehensive property testing with proptest integration
-- **Production Monitoring**: Runtime assertions and observability hooks
-- **Progressive Adoption**: Gradual verification level upgrades with automated scaffolding
-- **CI/CD Integration**: GitHub Actions support with configurable enforcement modes
-- **Hierarchical Configuration**: Module-level and item-level verification overrides
-- **Comprehensive Caching**: Content-addressed verification result caching
-- **Security-First**: Sandboxed execution and local-only verification options
+- **🚀 Command-Line Interface**: Full-featured CLI with project initialization, configuration management, and error explanation
+- **📊 Multi-Layer Verification**: Four progressive verification layers targeting different classes of errors
+- **📝 Formal Specifications**: TLA+ and Alloy integration for protocol-level correctness
+- **🔒 Type-Level Verification**: Session types and refinement types for compile-time guarantees
+- **🧪 Property-Based Testing**: Comprehensive property testing with proptest integration
+- **📈 Production Monitoring**: Runtime assertions and observability hooks
+- **⬆️ Progressive Adoption**: Gradual verification level upgrades with automated scaffolding
+- **🔄 CI/CD Integration**: GitHub Actions support with configurable enforcement modes
+- **⚙️ Hierarchical Configuration**: Module-level and item-level verification overrides
+- **💾 Comprehensive Caching**: Content-addressed verification result caching
+- **🔐 Security-First**: Sandboxed execution and local-only verification options
 
 ---
 
@@ -227,24 +276,24 @@ ferris-proof/
 
 ### ✅ Completed
 - **Core Infrastructure**: Rust workspace with 4 crates
-- **CI/CD Pipeline**: GitHub Actions with multi-platform testing
-- **Configuration System**: Hierarchical TOML configuration
-- **Plugin Architecture**: Extensible verification tool integration
-- **Property-Based Testing**: Framework for correctness validation
-- **Documentation**: Comprehensive specs and getting-started guides
-- **Security**: Sandboxed execution and input validation
+- **CLI Tool**: Complete command-line interface with project initialization, configuration management, and error explanation
+- **Configuration System**: Hierarchical TOML configuration with validation and discovery
+- **Plugin Architecture**: Extensible verification tool integration with sandboxed execution
+- **Property-Based Testing**: Framework for correctness validation with comprehensive test coverage
+- **Verification Cache**: Content-addressed caching system with invalidation logic
+- **CI/CD Pipeline**: GitHub Actions with multi-platform testing and property-based test integration
+- **Documentation**: Comprehensive specs, API docs, and getting-started guides
+- **Security**: Sandboxed execution, input validation, and local-only verification
 
 ### 🚧 In Progress
-- **Configuration Management**: File discovery and merging
-- **CLI Commands**: Project initialization and verification
-- **Verification Engine**: Core orchestration logic
-- **Cache System**: Content-addressed result caching
+- **Verification Engine**: Core orchestration logic for multi-layer verification
+- **Formal Specification Integration**: TLA+ and Alloy tool integration
+- **Type-Level Verification**: Session types and refinement types implementation
 
 ### 📋 Planned
-- **Formal Specification Integration**: TLA+ and Alloy support
-- **Type-Level Verification**: Session types and refinement types
-- **Production Monitoring**: Runtime assertions and observability
-- **Tool Integrations**: TLC, Alloy Analyzer, Kani, Loom
+- **Production Monitoring**: Runtime assertions and observability hooks
+- **Advanced Tool Integrations**: Kani, Loom, and additional verification backends
+- **Performance Optimizations**: Parallel verification and advanced caching strategies
 
 ## Setup & Installation
 
@@ -268,21 +317,51 @@ cd ferris-proof
 # Build all crates
 cargo build --all-features
 
-# Run tests
+# Run tests (including property-based tests)
 cargo test --all-features
-
-# Run property-based tests
-cargo test --all-features -- --ignored
 
 # Install CLI tool
 cargo install --path ferris-proof-cli
+
+# Verify installation
+ferris-proof --version
+```
+
+### Using the CLI Tool
+
+```bash
+# Initialise a new project
+ferris-proof init --level standard
+
+# Show project configuration
+ferris-proof config
+
+# Validate configuration
+ferris-proof config --validate
+
+# Explain error codes
+ferris-proof explain FP-CF-001
+
+# Get help for any command
+ferris-proof --help
+ferris-proof init --help
 ```
 
 ---
 
 ## Configuration
 
-Create a `ferrisproof.toml` file in your project root:
+FerrisProof uses hierarchical TOML configuration. Initialise a project to get started:
+
+```bash
+# Initialise with interactive prompts
+ferris-proof init --interactive
+
+# Or initialise with a specific level
+ferris-proof init --level standard
+```
+
+This creates a `ferrisproof.toml` file in your project root:
 
 ```toml
 [profile]
@@ -303,6 +382,26 @@ generate_reports = true
 max_verification_time = 300  # 5 minutes
 max_memory_usage = 2147483648  # 2GB
 cache_ttl = 86400  # 24 hours
+```
+
+### Verification Levels
+
+- **Minimal**: Type safety only
+- **Standard**: Type safety + Property-based testing
+- **Strict**: + Session types, refinement types, concurrency testing
+- **Formal**: + Formal specifications (TLA+, Alloy)
+
+### Configuration Commands
+
+```bash
+# Show current configuration
+ferris-proof config
+
+# Validate configuration
+ferris-proof config --validate
+
+# Show effective configuration for a specific file
+ferris-proof config --file src/main.rs
 ```
 
 ### Configuration Hierarchy
@@ -358,13 +457,21 @@ FerrisProof is designed with security in mind:
 
 ## Error Handling
 
-FerrisProof provides structured error handling with:
+FerrisProof provides comprehensive error handling with detailed explanations:
 
-- **Standardized error codes** (FP-XXX-XXX format)
-- **Detailed explanations** and suggested fixes
-- **Color-coded severity levels**
-- **Machine-readable error output**
-- **Comprehensive error catalog**
+```bash
+# Explain any error code
+ferris-proof explain FP-CF-001
+ferris-proof explain FP-VR-001
+ferris-proof explain FP-TL-001
+```
+
+### Error Code Categories
+
+- **FP-CF-XXX**: Configuration errors
+- **FP-VR-XXX**: Verification errors  
+- **FP-TL-XXX**: Tool errors
+- **FP-IO-XXX**: I/O and file system errors
 
 ### Common Error Codes
 
@@ -375,30 +482,125 @@ FerrisProof provides structured error handling with:
 | FP-VR-001 | Property test failure | Review counterexample |
 | FP-TL-001 | TLA+ TLC not found | Install TLA+ tools |
 
+Each error explanation includes:
+- Detailed description
+- Common causes
+- Step-by-step solutions
+- Code examples
+- Related error codes
+
+---
+
+## CLI Reference
+
+### Global Options
+
+```bash
+ferris-proof [OPTIONS] <COMMAND>
+
+Options:
+  --config <FILE>              Path to configuration file
+  -v, --verbose...             Enable verbose output (can be repeated)
+  --output-format <FORMAT>     Output format: human, json, compact
+  --no-color                   Disable colored output
+  -h, --help                   Print help
+  -V, --version                Print version
+```
+
+### Commands
+
+#### `init` - Initialise Project
+```bash
+ferris-proof init [OPTIONS]
+
+Options:
+  --level <LEVEL>              Verification level [default: standard]
+  --interactive                Use interactive mode
+  --template <TEMPLATE>        Project template to use
+```
+
+#### `config` - Show Configuration
+```bash
+ferris-proof config [OPTIONS]
+
+Options:
+  --file <FILE>                Show config for specific file
+  --validate                   Validate configuration
+```
+
+#### `explain` - Explain Error Codes
+```bash
+ferris-proof explain <ERROR_CODE>
+
+Arguments:
+  <ERROR_CODE>                 Error code to explain (e.g., FP-CF-001)
+```
+
 ---
 
 ## Workflow Examples
 
-### Project Initialisation
+### Project Initialization
 
 ```mermaid
 sequenceDiagram
     participant U as User
     participant CLI as CLI Tool
     participant CM as Config Manager
-    participant SV as Schema Validator
     participant FS as File System
 
     U->>CLI: ferris-proof init --level standard
-    CLI->>CLI: Parse arguments
-    CLI->>CM: create_default_config(level=standard)
-    CM->>SV: validate_schema(config)
-    SV-->>CM: ValidationResult::Ok
+    CLI->>CLI: Parse arguments and validate level
+    CLI->>CM: create_config_for_level(standard)
     CM->>FS: write ferrisproof.toml
     FS-->>CM: Success
-    CM->>FS: create specs/ directory
-    CM->>FS: create templates
-    CLI-->>U: ✓ Project initialized
+    CLI->>FS: create directory structure
+    CLI->>FS: create template files (if specified)
+    CLI-->>U: ✓ Project initialised successfully
+```
+
+### Configuration Management
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CLI as CLI Tool
+    participant CM as Config Manager
+    participant V as Validator
+
+    U->>CLI: ferris-proof config --validate
+    CLI->>CM: load_project_config()
+    CM->>CM: discover_config_files()
+    CM->>CM: merge_hierarchical_configs()
+    CM->>V: validate_config()
+    alt Valid Configuration
+        V-->>CM: ValidationResult::Ok
+        CM-->>CLI: Configuration valid
+        CLI-->>U: ✓ Configuration is valid
+    else Invalid Configuration
+        V-->>CM: ValidationResult::Error(details)
+        CM-->>CLI: Validation errors
+        CLI-->>U: ✗ Configuration validation failed
+    end
+```
+
+### Error Code Explanation
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CLI as CLI Tool
+    participant EC as Error Catalog
+
+    U->>CLI: ferris-proof explain FP-CF-001
+    CLI->>EC: lookup_error_code("FP-CF-001")
+    alt Known Error Code
+        EC-->>CLI: ErrorExplanation{title, description, causes, solutions}
+        CLI-->>U: Display formatted explanation
+    else Unknown Error Code
+        EC-->>CLI: None
+        CLI-->>U: Unknown error code + suggestions
+    end
 ```
 
 ### Verification with Caching
@@ -434,16 +636,17 @@ sequenceDiagram
 ## Documentation
 
 - [Getting Started Guide](docs/getting-started.md)
+- [CLI Reference](#cli-reference) - Complete command-line interface documentation
+- [Configuration Guide](#configuration) - Hierarchical configuration system
+- [Error Handling](#error-handling) - Comprehensive error code catalog
 - [CI Pipeline](docs/ci-pipeline.md)
-- [Configuration Reference](docs/configuration.md)
-- [Verification Levels](docs/verification-levels.md)
-- [Tool Integration](docs/tool-integration.md)
 - [API Documentation](https://docs.rs/ferris-proof)
 
 For detailed technical information:
 
 - **[Design Document](docs/ferris-proof.tsd.specs.md)** - Comprehensive architecture and implementation details
 - **[Requirements Document](docs/ferris-proof.prd.specs.md)** - Functional requirements and acceptance criteria
+- **[Task Tracking](.kiro/specs/ferris-proof/tasks.md)** - Implementation progress and task status
 
 ---
 
@@ -464,6 +667,6 @@ We welcome contributions! Please see [Contributing.md](Contributing.md) for guid
 
 ## Licence
 
-This work is dedicated to the public domain under the [CC0 1.0 Universal](Licence.md) license.
+This work is dedicated to the public domain under the [CC0 1.0 Universal](Licence.md) licence.
 
 To the extent possible under law, the contributors have waived all copyright and related or neighbouring rights to this work.
