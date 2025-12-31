@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use ferris_proof_core::{Layer, VerificationLevel};
 use std::path::PathBuf;
 
@@ -8,18 +8,26 @@ pub mod commands;
 #[command(name = "ferris-proof")]
 #[command(about = "Multi-layer correctness pipeline for Rust applications")]
 #[command(version)]
+#[command(long_about = "FerrisProof is a multi-layer correctness pipeline for Rust applications that combines formal modeling (TLA+, Alloy), Rust's type system, and property-based testing to ensure systems are memory-safe, structurally sound, and functionally correct.")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
     
-    #[arg(long, global = true, help = "Path to configuration file")]
+    /// Path to configuration file (overrides default discovery)
+    #[arg(long, global = true, value_name = "FILE")]
     pub config: Option<PathBuf>,
     
-    #[arg(long, global = true, help = "Enable verbose output")]
-    pub verbose: bool,
+    /// Enable verbose output (can be repeated for more verbosity)
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
+    pub verbose: u8,
     
-    #[arg(long, global = true, help = "Output format")]
+    /// Output format for results and reports
+    #[arg(long, global = true, value_enum)]
     pub output_format: Option<OutputFormat>,
+    
+    /// Disable colored output (respects NO_COLOR environment variable)
+    #[arg(long, global = true)]
+    pub no_color: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -104,44 +112,34 @@ pub enum CacheAction {
     Repair,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ValueEnum)]
 pub enum OutputFormat {
-    Json,
+    /// Human-readable output with colors and formatting
     Human,
+    /// JSON output for machine parsing
+    Json,
+    /// Compact single-line format for CI environments
     Compact,
 }
 
-impl std::str::FromStr for OutputFormat {
-    type Err = String;
-    
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "json" => Ok(OutputFormat::Json),
-            "human" => Ok(OutputFormat::Human),
-            "compact" => Ok(OutputFormat::Compact),
-            _ => Err(format!("Invalid output format: {}", s)),
-        }
+impl Default for OutputFormat {
+    fn default() -> Self {
+        OutputFormat::Human
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, ValueEnum)]
 pub enum GenerateTarget {
+    /// Generate property-based tests
+    #[value(name = "property-tests")]
     PropertyTests,
+    /// Generate session type definitions
+    #[value(name = "session-types")]
     SessionTypes,
+    /// Generate refinement type definitions
+    #[value(name = "refinement-types")]
     RefinementTypes,
+    /// Generate formal specification templates
+    #[value(name = "formal-specs")]
     FormalSpecs,
-}
-
-impl std::str::FromStr for GenerateTarget {
-    type Err = String;
-    
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "property-tests" => Ok(GenerateTarget::PropertyTests),
-            "session-types" => Ok(GenerateTarget::SessionTypes),
-            "refinement-types" => Ok(GenerateTarget::RefinementTypes),
-            "formal-specs" => Ok(GenerateTarget::FormalSpecs),
-            _ => Err(format!("Invalid generate target: {}", s)),
-        }
-    }
 }

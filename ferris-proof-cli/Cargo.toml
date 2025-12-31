@@ -30,3 +30,8 @@ tracing-subscriber.workspace = true
 colored.workspace = true
 console.workspace = true
 dirs.workspace = true
+toml = "0.8"
+
+[dev-dependencies]
+proptest = "1.4"
+tempfile = "3.8"

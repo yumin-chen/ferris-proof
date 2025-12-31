@@ -1,17 +1,25 @@
 use clap::Parser;
 use ferris_proof_cli::{Cli, Commands, CacheAction};
 use std::process;
-use tracing::{error, info};
+use tracing::{error, info, Level};
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
+    let cli = Cli::parse();
+    
+    // Initialize tracing based on verbosity level
+    let log_level = match cli.verbose {
+        0 => Level::WARN,
+        1 => Level::INFO,
+        2 => Level::DEBUG,
+        _ => Level::TRACE,
+    };
+    
     tracing_subscriber::fmt()
+        .with_max_level(log_level)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let cli = Cli::parse();
-    
     info!("FerrisProof starting with command: {:?}", cli.command);
 
     let result = match cli.command {
