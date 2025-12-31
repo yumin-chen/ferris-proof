@@ -1,6 +1,6 @@
 # FerrisProof
 
-> *Rust. Verified. Proven.*
+> **Rust. Verified. Proven.**: *Making Rust systems provably correct, one layer at a time.* 
 
 FerrisProof is a **full-stack correctness pipeline** for Rust applications, combining **formal modeling (TLA+, Alloy)**, **Rust's type system**, and **property-based testing** to ensure your systems are **memory-safe, structurally sound, and functionally correct**.
 
@@ -96,29 +96,29 @@ graph TB
 ```mermaid
 graph TD
     ROOT[Root Config<br/>ferrisproof.toml]
-    
+
     subgraph "Module Overrides"
         CRYPTO[crypto/*<br/>level: formal]
         API[api/*<br/>level: standard]
         UTILS[utils/*<br/>level: minimal]
     end
-    
+
     subgraph "Item Attributes"
-        FUNC[#[verification(level="strict")]<br/>Function Level]
-        MOD[#[verification(spec="raft.tla")]<br/>Module Level]
+        FUNC["Function Level<br/><code>#[verification(level = strict)]</code>"]
+        MOD["Module Level<br/><code>#[verification(spec = raft.tla)]</code>"]
     end
-    
+
     ROOT --> CRYPTO
     ROOT --> API
     ROOT --> UTILS
-    
+
     CRYPTO --> FUNC
     API --> MOD
 ```
 
 ---
 
-## ?? Project Structure
+## Project Structure
 
 ```
 ferris-proof/
@@ -127,6 +127,9 @@ ferris-proof/
 ├── models/                      # TLA+ & Alloy formal models
 ├── tests/                       # Property-based and integration tests
 ├── scripts/                     # Automation scripts
+├── docs/                         # Documentation
+│   ├── ferris-proof.tsd.specs.md # Detailed architecture design
+│   └── ferris-proof.prd.specs.md # Functional requirements
 ├── ferrisproof.toml            # Root configuration
 └── ReadMe.md
 ```
@@ -138,7 +141,7 @@ ferris-proof/
 1. **Clone the repository**:
 
 ```bash
-git clone https://github.com/yourusername/ferris-proof.git
+git clone https://github.com/yumin-chen/ferris-proof.git
 cd ferris-proof
 ```
 
@@ -184,7 +187,7 @@ cargo test --test integration_tests
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 FerrisProof uses hierarchical TOML configuration with the following precedence (highest to lowest):
 
@@ -258,7 +261,7 @@ FerrisProof is designed with security in mind:
 
 ---
 
-## ?? Error Handling
+## Error Handling
 
 FerrisProof provides structured error handling with:
 
@@ -279,7 +282,7 @@ FerrisProof provides structured error handling with:
 
 ---
 
-## 🔄 Workflow Examples
+## Workflow Examples
 
 ### Project Initialization
 
@@ -334,6 +337,15 @@ sequenceDiagram
 
 ---
 
+## Documentation
+
+For detailed information, see:
+
+- **[Design Document](docs/ferris-proof.tsd.specs.md)** - Comprehensive architecture and implementation details
+- **[Requirements Document](docs/ferris-proof.prd.specs.md)** - Functional requirements and acceptance criteria
+
+---
+
 ## Future Directions
 
 * Auto-generate Rust property tests from Alloy/TLA+ models
@@ -342,6 +354,12 @@ sequenceDiagram
 * Runtime trace comparison with TLA+ execution paths
 * Advanced caching and incremental verification
 * Plugin ecosystem for additional verification backends
+
+---
+
+## Contributing
+
+FerrisProof welcomes contributions!
 
 ---
 
