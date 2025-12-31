@@ -81,56 +81,138 @@ FerrisProof supports four configurable verification levels:
 
 ```mermaid
 graph TB
+    %% Core FerrisProof Components
     subgraph "FerrisProof Core"
-        CM[Configuration Manager]
-        VE[Verification Engine]
-        CLI[CLI Tool]
-        PM[Plugin Manager]
+        CLI["CLI Tool"]
+        CM["Configuration Manager"]
+        VE["Verification Engine"]
+        Cache["Verification Cache"]
+        Metrics["Metrics Collector"]
+        PM["Plugin Manager"]
     end
-    
+
+    %% Verification Layers (DAG with Rust guarantees)
     subgraph "Verification Layers"
-        L1[Layer 1: Formal Specs<br/>TLA+/Alloy]
-        L2[Layer 2: Type-Level<br/>Session/Refinement Types]
-        L3[Layer 3: Property-Based<br/>Testing]
-        L4[Layer 4: Production<br/>Monitoring]
+        L1["Layer 1: Formal Spec (TLA+/Alloy)"]
+        L2["Layer 2: Type-Level Verification (Session & Refinement Types)"]
+        L3["Layer 3: Property-Based Testing (Proptest/Kani/Bolero)"]
+        L4["Layer 4: Production Monitoring (Runtime Assertions, Metrics)"]
     end
-    
-    subgraph "External Tools"
-        TLA[TLA+ TLC]
-        ALLOY[Alloy Analyzer]
-        PROP[Proptest/Bolero]
-        KANI[Kani Verifier]
-        LOOM[Loom]
+
+    %% Rust Type Guarantees
+    subgraph "Rust-Specific Safety"
+        TS["Typestate & Linear Types"]
+        RT["Refinement Types"]
+        AST["AST Validation & Attribute Macros"]
     end
-    
-    subgraph "Configuration Sources"
-        ROOT[ferrisproof.toml]
-        MOD[Module Configs]
-        ATTR[Attribute Macros]
+
+    %% Sandboxed External Tools
+    subgraph "External Tools (Sandboxed)"
+        TLA["TLA+ TLC"]
+        ALLOY["Alloy Analyzer"]
+        PROP["Proptest"]
+        KANI["Kani Verifier"]
+        LOOM["Loom Concurrency"]
     end
-    
+
+    %% CLI & Config Flow
     CLI --> CM
-    CM --> ROOT
-    CM --> MOD
-    CM --> ATTR
-    
+    CLI --> VE
+    CM --> VE
+    VE --> Cache
+    VE --> Metrics
+    VE --> PM
+
+    %% Layer Execution with Rust Guarantees
     VE --> L1
-    VE --> L2
-    VE --> L3
-    VE --> L4
-    
-    L1 --> TLA
+    L1 --> TS
     L1 --> ALLOY
-    L3 --> PROP
-    L3 --> KANI
-    L3 --> LOOM
-    
+    VE --> L2
+    L2 --> TS
+    L2 --> RT
+    VE --> L3
+    L3 --> AST
+    VE --> L4
+
+    %% Layer DAG Enforcement
+    L1 -->|success| L2
+    L2 -->|success| L3
+    L3 -->|success| L4
+
+    %% Plugin Manager & Sandbox
     PM --> TLA
     PM --> ALLOY
     PM --> PROP
     PM --> KANI
     PM --> LOOM
+
+    TLA --> FS1["Filesystem: Restricted Paths"]
+    ALLOY --> FS1
+    PROP --> FS2["Filesystem: Restricted Paths"]
+    KANI --> FS2
+    LOOM --> FS2
+
+    TLA --> NET1["Network: Denied/Allowlist"]
+    ALLOY --> NET1
+    PROP --> NET2["Network: Denied/Allowlist"]
+    KANI --> NET2
+    LOOM --> NET2
+
+    %% Cache Awareness
+    L1 --> Cache
+    L2 --> Cache
+    L3 --> Cache
+    L4 --> Cache
+
+    %% Metrics & Observability
+    L1 --> Metrics
+    L2 --> Metrics
+    L3 --> Metrics
+    L4 --> Metrics
+
+    %% Styling
+    classDef rustType fill:#c6f5d0,stroke:#2a9d8f,stroke-width:2px;
+    class CLI,CM,VE,Cache,Metrics,PM,L1,L2,L3,L4,TS,RT,AST rustType
+    classDef sandbox fill:#fdf6e3,stroke:#f4a261,stroke-width:2px;
+    class TLA,ALLOY,PROP,KANI,LOOM,FS1,FS2,NET1,NET2 sandbox
 ```
+
+### **Highlights**
+
+1. **Rust-Centric Type Guarantees**
+
+   * Typestate & linear types enforce layer dependencies at compile-time.
+   * Refinement types validate value-level invariants.
+   * AST validation ensures attribute macros and configuration correctness.
+
+2. **Layered DAG Enforcement**
+
+   * Each layer only executes if prior layers pass successfully.
+   * Ensures **formal → type → property → monitoring** sequence is never violated.
+
+3. **Incremental Verification & Caching**
+
+   * All layers are cache-aware; avoids redundant execution.
+   * Cache keyed by **AST content, configuration hash, and tool versions**.
+
+4. **Sandboxed Plugin Execution**
+
+   * External tools run in isolated sandboxes with:
+
+     * Restricted filesystem access
+     * Network denied or allowlist
+     * Resource limits (CPU, memory, file descriptors)
+   * Captures outputs for structured parsing.
+
+5. **Observability & Metrics**
+
+   * Metrics collected for all layers: execution time, cache hits, violations.
+   * Supports structured logs for CI and human-readable output.
+
+6. **Unified Orchestration**
+
+   * CLI → Config → Verification Engine → Plugin Manager → Layers → Cache/Metrics
+   * Ensures reproducible, safe, and type-checked verification runs.
 
 ### Configuration Hierarchy
 
