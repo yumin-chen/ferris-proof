@@ -34,3 +34,5 @@ dirs.workspace = true
 [dev-dependencies]
 proptest.workspace = true
 tempfile.workspace = true
+ferris-proof-config = { path = "../ferris-proof-config" }
+ferris-proof-plugins = { path = "../ferris-proof-plugins" }
