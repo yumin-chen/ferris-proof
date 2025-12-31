@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FerrisProof Configuration",
+  "type": "object",
+  "properties": {
+    "profile": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["minimal", "standard", "strict", "formal"]
+        },
+        "enforcement": {
+          "type": "string",
+          "enum": ["advisory", "warning", "error"]
+        },
+        "enabled_techniques": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "TypeSafety",
+              "PropertyTests", 
+              "SessionTypes",
+              "RefinementTypes",
+              "ConcurrencyTesting",
+              "FormalSpecs",
+              "ModelChecking"
+            ]
+          }
+        }
+      },
+      "required": ["level", "enforcement", "enabled_techniques"]
+    },
+    "tools": {
+      "type": "object",
+      "properties": {
+        "tla_plus": {
+          "type": "object",
+          "properties": {
+            "tlc_path": { "type": "string" },
+            "timeout": { "type": "integer", "minimum": 1 },
+            "workers": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "alloy": {
+          "type": "object", 
+          "properties": {
+            "analyzer_path": { "type": "string" },
+            "scope": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "proptest": {
+          "type": "object",
+          "properties": {
+            "cases": { "type": "integer", "minimum": 1 },
+            "max_shrink_iters": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "kani": {
+          "type": "object",
+          "properties": {
+            "cbmc_path": { "type": "string" },
+            "unwind": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "cache_enabled": { "type": "boolean" },
+        "parallel_execution": { "type": "boolean" },
+        "generate_reports": { "type": "boolean" }
+      },
+      "required": ["cache_enabled", "parallel_execution", "generate_reports"]
+    },
+    "thresholds": {
+      "type": "object", 
+      "properties": {
+        "max_verification_time": { "type": "integer", "minimum": 1 },
+        "max_memory_usage": { "type": "integer", "minimum": 1 },
+        "cache_ttl": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["max_verification_time", "max_memory_usage", "cache_ttl"]
+    }
+  },
+  "required": ["profile", "features", "thresholds"]
+}

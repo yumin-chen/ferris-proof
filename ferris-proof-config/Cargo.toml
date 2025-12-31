@@ -1,0 +1,29 @@
+[package]
+name = "ferris-proof-config"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "Configuration management for FerrisProof"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+ferris-proof-core = { path = "../ferris-proof-core" }
+
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+walkdir.workspace = true
+glob.workspace = true
+jsonschema.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true

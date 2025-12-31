@@ -1,0 +1,28 @@
+[package]
+name = "ferris-proof-plugins"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "Plugin system for FerrisProof verification tools"
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+ferris-proof-core = { path = "../ferris-proof-core" }
+
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+which.workspace = true
+regex.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
