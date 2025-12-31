@@ -75,6 +75,33 @@ pub enum Commands {
         #[arg(help = "Error code to explain")]
         error_code: String,
     },
+    
+    /// Manage verification cache
+    Cache {
+        #[command(subcommand)]
+        action: CacheAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CacheAction {
+    /// Show cache information and statistics
+    Info,
+    
+    /// Clean up expired cache entries
+    Cleanup,
+    
+    /// Clear all cache entries
+    Clear,
+    
+    /// Compact cache by removing expired entries and optimizing storage
+    Compact,
+    
+    /// Check cache health and integrity
+    Health,
+    
+    /// Repair corrupted cache entries
+    Repair,
 }
 
 #[derive(Clone, Debug)]

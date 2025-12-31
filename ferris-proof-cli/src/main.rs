@@ -1,5 +1,5 @@
 use clap::Parser;
-use ferris_proof_cli::{Cli, Commands};
+use ferris_proof_cli::{Cli, Commands, CacheAction};
 use std::process;
 use tracing::{error, info};
 
@@ -32,6 +32,9 @@ async fn main() {
         }
         Commands::Explain { error_code } => {
             ferris_proof_cli::commands::explain::run(error_code).await
+        }
+        Commands::Cache { action } => {
+            ferris_proof_cli::commands::cache::run(action).await
         }
     };
 
