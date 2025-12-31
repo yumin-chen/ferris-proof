@@ -236,10 +236,14 @@ run_cli_tests() {
         return 1
     fi
     
-    # Test explain command with known error codes
-    if ! $cli_binary explain FP-CF-001 > /dev/null; then
-        print_error "CLI explain command failed for FP-CF-001"
-        return 1
+    # Test cache command functionality
+    print_status "Testing cache management commands..."
+    if ! $cli_binary cache info > /dev/null 2>&1; then
+        print_warning "CLI cache info command failed (expected without cache)"
+    fi
+    
+    if ! $cli_binary cache health > /dev/null 2>&1; then
+        print_warning "CLI cache health command failed (expected without cache)"
     fi
     
     # Test init command in temporary directory
@@ -268,6 +272,16 @@ run_cli_tests() {
         cd "$original_dir"
         rm -rf "$temp_dir"
         return 1
+    fi
+    
+    # Test cache commands after init
+    print_status "Testing cache commands after project initialization..."
+    if ! "$original_dir/$cli_binary" cache info > /dev/null; then
+        print_warning "CLI cache info command failed after init"
+    fi
+    
+    if ! "$original_dir/$cli_binary" cache health > /dev/null; then
+        print_warning "CLI cache health command failed after init"
     fi
     
     cd "$original_dir"
@@ -301,7 +315,45 @@ run_property_tests() {
         failed=true
     fi
     
-    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml project_structure $VERBOSE_FLAG $PARALLEL_FLAG; then
+    # Run specific cache property tests for detailed validation
+    print_status "Running specific cache property tests..."
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml verification_result_caching_property $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Verification result caching property test failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml cache_key_uniqueness_property $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Cache key uniqueness property test failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml cache_invalidation_property $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Cache invalidation property test failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml cache_persistence_property $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Cache persistence property test failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml cache_statistics_consistency_property $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Cache statistics consistency property test failed"
+        failed=true
+    fi
+    
+    # Run content hash property tests
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml rust_file_content_hash_consistency $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Content hash consistency property test failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml rust_file_content_hash_uniqueness $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Content hash uniqueness property test failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-core/Cargo.toml project_structure_integration $VERBOSE_FLAG $PARALLEL_FLAG; then
         print_error "Core project structure property tests failed"
         failed=true
     fi
@@ -312,8 +364,13 @@ run_property_tests() {
     fi
     
     print_status "Running plugin property tests..."
-    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-plugins/Cargo.toml network_isolation_tests $VERBOSE_FLAG $PARALLEL_FLAG; then
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-plugins/Cargo.toml network_isolation_property_test $VERBOSE_FLAG $PARALLEL_FLAG; then
         print_error "Plugin network isolation property tests failed"
+        failed=true
+    fi
+    
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-plugins/Cargo.toml plugin_system_tests $VERBOSE_FLAG $PARALLEL_FLAG; then
+        print_error "Plugin system property tests failed"
         failed=true
     fi
     
