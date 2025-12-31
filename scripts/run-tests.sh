@@ -46,7 +46,7 @@ Usage: $0 [OPTIONS]
 Run FerrisProof test suite with various configurations.
 
 OPTIONS:
-    -t, --type TYPE         Test type: unit, integration, property, all (default: all)
+    -t, --type TYPE         Test type: unit, integration, property, cli, all (default: all)
     -v, --verbose           Enable verbose output
     -c, --cases NUM         Number of property test cases (default: 1000)
     -s, --shrink NUM        Max shrink iterations for property tests (default: 10000)
@@ -58,6 +58,7 @@ OPTIONS:
 EXAMPLES:
     $0                      # Run all tests with default settings
     $0 -t unit              # Run only unit tests
+    $0 -t cli               # Run only CLI tests
     $0 -t property -c 5000  # Run property tests with 5000 cases
     $0 -C                   # Run all tests with coverage
     $0 -v -t all            # Run all tests with verbose output
@@ -116,11 +117,11 @@ done
 
 # Validate test type
 case $TEST_TYPE in
-    unit|integration|property|all)
+    unit|integration|property|cli|all)
         ;;
     *)
         print_error "Invalid test type: $TEST_TYPE"
-        print_error "Valid types: unit, integration, property, all"
+        print_error "Valid types: unit, integration, property, cli, all"
         exit 1
         ;;
 esac
@@ -190,6 +191,91 @@ run_integration_tests() {
     fi
 }
 
+# Function to run CLI tests
+run_cli_tests() {
+    print_status "Running CLI tests..."
+    
+    # Build CLI binary first
+    print_status "Building CLI binary..."
+    if ! cargo build --bin ferris-proof $VERBOSE_FLAG; then
+        print_error "Failed to build CLI binary"
+        return 1
+    fi
+    
+    # Run CLI unit tests
+    print_status "Running CLI unit tests..."
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_commands_unit_test $VERBOSE_FLAG -- --test-threads=1; then
+        print_error "CLI unit tests failed"
+        return 1
+    fi
+    
+    # Run CLI integration tests
+    print_status "Running CLI integration tests..."
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-cli/Cargo.toml --tests $VERBOSE_FLAG -- --test-threads=1; then
+        print_error "CLI integration tests failed"
+        return 1
+    fi
+    
+    # Test CLI binary functionality
+    print_status "Testing CLI binary functionality..."
+    local cli_binary="./target/debug/ferris-proof"
+    
+    if [ ! -f "$cli_binary" ]; then
+        print_error "CLI binary not found at $cli_binary"
+        return 1
+    fi
+    
+    # Test basic commands
+    if ! $cli_binary --help > /dev/null; then
+        print_error "CLI help command failed"
+        return 1
+    fi
+    
+    if ! $cli_binary --version > /dev/null; then
+        print_error "CLI version command failed"
+        return 1
+    fi
+    
+    # Test explain command with known error codes
+    if ! $cli_binary explain FP-CF-001 > /dev/null; then
+        print_error "CLI explain command failed for FP-CF-001"
+        return 1
+    fi
+    
+    # Test init command in temporary directory
+    local temp_dir=$(mktemp -d)
+    local original_dir=$(pwd)
+    
+    cd "$temp_dir"
+    if ! "$original_dir/$cli_binary" init --level standard > /dev/null; then
+        print_error "CLI init command failed"
+        cd "$original_dir"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Verify init created expected files
+    if [ ! -f "ferrisproof.toml" ] || [ ! -d "specs" ] || [ ! -d "tests" ]; then
+        print_error "CLI init command did not create expected files/directories"
+        cd "$original_dir"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # Test config command after init
+    if ! "$original_dir/$cli_binary" config > /dev/null; then
+        print_error "CLI config command failed after init"
+        cd "$original_dir"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    cd "$original_dir"
+    rm -rf "$temp_dir"
+    
+    print_success "CLI tests passed"
+}
+
 # Function to run property tests
 run_property_tests() {
     print_status "Running property-based tests..."
@@ -228,6 +314,12 @@ run_property_tests() {
     print_status "Running plugin property tests..."
     if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-plugins/Cargo.toml network_isolation_tests $VERBOSE_FLAG $PARALLEL_FLAG; then
         print_error "Plugin network isolation property tests failed"
+        failed=true
+    fi
+    
+    print_status "Running CLI property tests..."
+    if ! timeout "${TIMEOUT_MINUTES}m" cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test $VERBOSE_FLAG -- --test-threads=1; then
+        print_error "CLI initialization property tests failed"
         failed=true
     fi
     
@@ -289,9 +381,13 @@ main() {
         property)
             run_property_tests || exit_code=1
             ;;
+        cli)
+            run_cli_tests || exit_code=1
+            ;;
         all)
             run_unit_tests || exit_code=1
             run_integration_tests || exit_code=1
+            run_cli_tests || exit_code=1
             run_property_tests || exit_code=1
             ;;
     esac

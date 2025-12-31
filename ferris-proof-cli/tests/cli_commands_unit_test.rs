@@ -10,99 +10,113 @@ mod init_command_tests {
     #[tokio::test]
     async fn test_init_command_creates_config_file() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(VerificationLevel::Standard, false, None).await;
         
-        // Check result before changing directory back
+        // Check result while still in temp directory
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
         
-        let config_path = temp_dir.path().join("ferrisproof.toml");
+        // Check that config file was created
+        let config_path = temp_path.join("ferrisproof.toml");
         assert!(config_path.exists());
         
         let config_content = fs::read_to_string(&config_path).unwrap();
         assert!(config_content.contains("level = \"standard\""));
         
+        // Restore directory
         std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_init_command_creates_directories_for_minimal_level() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(VerificationLevel::Minimal, false, None).await;
         
-        // Check result and directories before changing back
+        // Check result while still in temp directory
         assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
         
-        // Check basic directories
-        assert!(temp_dir.path().join("specs").exists());
-        assert!(temp_dir.path().join("tests").exists());
+        // Check basic directories exist
+        assert!(temp_path.join("specs").exists());
+        assert!(temp_path.join("tests").exists());
         
         // Minimal level should not create additional directories
-        assert!(!temp_dir.path().join("tests/property").exists());
+        assert!(!temp_path.join("tests/property").exists());
         
+        // Restore directory
         std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_init_command_creates_directories_for_standard_level() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(VerificationLevel::Standard, false, None).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
         
-        // Check basic directories
-        assert!(temp_dir.path().join("specs").exists());
-        assert!(temp_dir.path().join("tests").exists());
+        // Check basic directories exist
+        assert!(temp_path.join("specs").exists());
+        assert!(temp_path.join("tests").exists());
         
         // Standard level should create property test directory
-        assert!(temp_dir.path().join("tests/property").exists());
+        assert!(temp_path.join("tests/property").exists());
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_init_command_creates_directories_for_formal_level() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(VerificationLevel::Formal, false, None).await;
         
-        // Check result and directories before changing back
+        // Check result while still in temp directory
         assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
         
-        // Check all directories for formal level
-        assert!(temp_dir.path().join("specs").exists());
-        assert!(temp_dir.path().join("tests").exists());
-        assert!(temp_dir.path().join("tests/property").exists());
-        assert!(temp_dir.path().join("specs/session-types").exists());
-        assert!(temp_dir.path().join("specs/refinement-types").exists());
-        assert!(temp_dir.path().join("specs/formal").exists());
-        assert!(temp_dir.path().join("specs/formal/tla").exists());
-        assert!(temp_dir.path().join("specs/formal/alloy").exists());
+        // Check all directories for formal level exist
+        assert!(temp_path.join("specs").exists());
+        assert!(temp_path.join("tests").exists());
+        assert!(temp_path.join("tests/property").exists());
+        assert!(temp_path.join("specs/session-types").exists());
+        assert!(temp_path.join("specs/refinement-types").exists());
+        assert!(temp_path.join("specs/formal").exists());
+        assert!(temp_path.join("specs/formal/tla").exists());
+        assert!(temp_path.join("specs/formal/alloy").exists());
         
+        // Restore directory
         std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_init_command_with_template() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(
             VerificationLevel::Standard, 
@@ -110,14 +124,23 @@ mod init_command_tests {
             Some("standard".to_string())
         ).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
         
         // Check that config file was created
-        let config_path = temp_dir.path().join("ferrisproof.toml");
+        let config_path = temp_path.join("ferrisproof.toml");
         assert!(config_path.exists());
+        
+        // Check that template files were created
+        let readme_path = temp_path.join("README.md");
+        assert!(readme_path.exists());
+        
+        let property_test_path = temp_path.join("tests/property/example_properties.rs");
+        assert!(property_test_path.exists());
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 }
 
@@ -143,83 +166,97 @@ mod config_command_tests {
     #[tokio::test]
     async fn test_config_command_with_valid_config() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         // First create a config file
         let init_result = init::run(VerificationLevel::Standard, false, None).await;
         assert!(init_result.is_ok());
+        assert_eq!(init_result.unwrap(), 0);
         
         // Then test the config command
         let result = config::run(None, false).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_config_validation_with_valid_config() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         // First create a config file
         let init_result = init::run(VerificationLevel::Standard, false, None).await;
         assert!(init_result.is_ok());
+        assert_eq!(init_result.unwrap(), 0);
         
         // Then test validation
         let result = config::run(None, true).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0); // Should pass validation
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_config_validation_without_config() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = config::run(None, true).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
-        // The ConfigManager creates a default config, so validation should pass
-        // but the config command should fail when trying to show project config
-        assert_eq!(result.unwrap(), 0); // Changed expectation based on actual behavior
+        // Validation without config should still work (uses default config)
+        assert_eq!(result.unwrap(), 0);
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 
     #[tokio::test]
     async fn test_config_command_for_specific_file() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         // Create a config file
         let init_result = init::run(VerificationLevel::Standard, false, None).await;
         assert!(init_result.is_ok());
+        assert_eq!(init_result.unwrap(), 0);
         
         // Create a test file
-        let test_file = temp_dir.path().join("src").join("main.rs");
+        let test_file = temp_path.join("src").join("main.rs");
         fs::create_dir_all(test_file.parent().unwrap()).unwrap();
         fs::write(&test_file, "fn main() {}").unwrap();
         
         // Test config for specific file
         let result = config::run(Some(test_file), false).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 }
 
@@ -299,9 +336,10 @@ mod integration_tests {
     #[tokio::test]
     async fn test_init_then_config_workflow() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         // Initialize project
         let init_result = init::run(VerificationLevel::Strict, false, None).await;
@@ -318,6 +356,7 @@ mod integration_tests {
         assert!(validate_result.is_ok());
         assert_eq!(validate_result.unwrap(), 0);
         
+        // Restore directory
         std::env::set_current_dir(original_dir).unwrap();
     }
 
@@ -332,23 +371,27 @@ mod integration_tests {
         
         for level in levels {
             let temp_dir = TempDir::new().unwrap();
+            let temp_path = temp_dir.path().to_path_buf();
             let original_dir = std::env::current_dir().unwrap();
             
-            std::env::set_current_dir(temp_dir.path()).unwrap();
+            std::env::set_current_dir(&temp_path).unwrap();
             
             let result = init::run(level, false, None).await;
+            
+            // Check result while still in temp directory
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), 0);
             
             // Verify config contains correct level
-            let config_path = temp_dir.path().join("ferrisproof.toml");
+            let config_path = temp_path.join("ferrisproof.toml");
             assert!(config_path.exists());
             
             let config_content = fs::read_to_string(&config_path).unwrap();
             let level_str = format!("{:?}", level).to_lowercase();
             assert!(config_content.contains(&format!("level = \"{}\"", level_str)));
             
-            std::env::set_current_dir(original_dir).unwrap();
+            // Restore directory
+            std::env::set_current_dir(&original_dir).unwrap();
         }
     }
 }

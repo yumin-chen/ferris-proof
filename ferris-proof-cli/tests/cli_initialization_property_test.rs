@@ -1,7 +1,6 @@
 use proptest::prelude::*;
 use tempfile::TempDir;
 use std::fs;
-use std::path::Path;
 use ferris_proof_core::VerificationLevel;
 use ferris_proof_cli::commands::init;
 
@@ -129,40 +128,47 @@ mod unit_tests {
     #[tokio::test]
     async fn test_init_creates_config_file() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(VerificationLevel::Standard, false, None).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 0);
         
-        let config_path = temp_dir.path().join("ferrisproof.toml");
+        let config_path = temp_path.join("ferrisproof.toml");
         assert!(config_path.exists());
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
     
     #[tokio::test]
     async fn test_init_creates_directories() {
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
         let original_dir = std::env::current_dir().unwrap();
         
-        std::env::set_current_dir(temp_dir.path()).unwrap();
+        std::env::set_current_dir(&temp_path).unwrap();
         
         let result = init::run(VerificationLevel::Formal, false, None).await;
         
-        std::env::set_current_dir(original_dir).unwrap();
-        
+        // Check result while still in temp directory
         assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
         
         // Check that all expected directories exist
-        assert!(temp_dir.path().join("specs").exists());
-        assert!(temp_dir.path().join("tests").exists());
-        assert!(temp_dir.path().join("tests/property").exists());
-        assert!(temp_dir.path().join("specs/formal").exists());
-        assert!(temp_dir.path().join("specs/formal/tla").exists());
-        assert!(temp_dir.path().join("specs/formal/alloy").exists());
+        assert!(temp_path.join("specs").exists());
+        assert!(temp_path.join("tests").exists());
+        assert!(temp_path.join("tests/property").exists());
+        assert!(temp_path.join("specs/formal").exists());
+        assert!(temp_path.join("specs/formal/tla").exists());
+        assert!(temp_path.join("specs/formal/alloy").exists());
+        
+        // Restore directory
+        std::env::set_current_dir(original_dir).unwrap();
     }
 }

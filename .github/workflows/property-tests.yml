@@ -26,6 +26,98 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  cli-integration-tests:
+    name: CLI Integration Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-cli-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build CLI binary
+      run: cargo build --bin ferris-proof --verbose
+
+    - name: Run CLI unit tests
+      run: |
+        echo "Running CLI unit tests..."
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_commands_unit_test --verbose -- --test-threads=1
+      timeout-minutes: 10
+
+    - name: Test CLI binary functionality
+      shell: bash
+      run: |
+        echo "Testing CLI binary functionality..."
+        
+        # Determine binary path based on OS
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          CLI_BINARY="./target/debug/ferris-proof.exe"
+        else
+          CLI_BINARY="./target/debug/ferris-proof"
+        fi
+        
+        # Test basic commands
+        $CLI_BINARY --help
+        $CLI_BINARY --version
+        
+        # Test explain command with known error codes
+        $CLI_BINARY explain FP-CF-001
+        $CLI_BINARY explain FP-VR-001
+        $CLI_BINARY explain FP-TL-001
+        $CLI_BINARY explain FP-IO-001
+        
+        # Test config command (should fail gracefully without config)
+        $CLI_BINARY config || echo "Config command failed as expected without ferrisproof.toml"
+        
+        # Test init command in temporary directory
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          TEMP_DIR=$(mktemp -d -t ferris-test-XXXXXX)
+        else
+          TEMP_DIR=$(mktemp -d)
+        fi
+        
+        cd "$TEMP_DIR"
+        
+        # Use absolute path to CLI binary
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          "$GITHUB_WORKSPACE/target/debug/ferris-proof.exe" init --level standard
+        else
+          "$GITHUB_WORKSPACE/target/debug/ferris-proof" init --level standard
+        fi
+        
+        # Verify init created expected files and directories
+        test -f ferrisproof.toml
+        test -d specs
+        test -d tests
+        test -d tests/property
+        
+        # Test config command after init
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          "$GITHUB_WORKSPACE/target/debug/ferris-proof.exe" config
+          "$GITHUB_WORKSPACE/target/debug/ferris-proof.exe" config --validate
+        else
+          "$GITHUB_WORKSPACE/target/debug/ferris-proof" config
+          "$GITHUB_WORKSPACE/target/debug/ferris-proof" config --validate
+        fi
+        
+        # Clean up
+        cd "$GITHUB_WORKSPACE"
+        rm -rf "$TEMP_DIR"
+      timeout-minutes: 10
+
   property-tests:
     name: Property-Based Tests
     runs-on: ${{ matrix.os }}
@@ -91,6 +183,16 @@ jobs:
         PROPTEST_MAX_SHRINK_ITERS: ${{ matrix.max_shrink }}
         PROPTEST_TIMEOUT: 1800000  # 30 minutes
 
+    - name: Run CLI Property Tests
+      run: |
+        echo "Running CLI property tests..."
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test --verbose -- --nocapture --test-threads=1
+      timeout-minutes: 20
+      env:
+        PROPTEST_CASES: ${{ matrix.test_cases }}
+        PROPTEST_MAX_SHRINK_ITERS: ${{ matrix.max_shrink }}
+        PROPTEST_TIMEOUT: 1200000  # 20 minutes
+
     - name: Generate Property Test Report
       if: always()
       run: |
@@ -107,6 +209,7 @@ jobs:
         echo "- Configuration system property tests" >> property-test-report.md
         echo "- Core system property tests (caching, project structure)" >> property-test-report.md
         echo "- Plugin system property tests (network isolation)" >> property-test-report.md
+        echo "- CLI system property tests (initialization)" >> property-test-report.md
 
     - name: Upload Property Test Report
       uses: actions/upload-artifact@v3
@@ -140,6 +243,7 @@ jobs:
       run: |
         echo "Running property tests on current branch..."
         cargo test --all-features -- property > current-results.txt 2>&1 || true
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test >> current-results.txt 2>&1 || true
       env:
         PROPTEST_CASES: 1000
         PROPTEST_MAX_SHRINK_ITERS: 10000
@@ -152,6 +256,7 @@ jobs:
       run: |
         echo "Running property tests on base branch..."
         cargo test --all-features -- property > base-results.txt 2>&1 || true
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test >> base-results.txt 2>&1 || true
       env:
         PROPTEST_CASES: 1000
         PROPTEST_MAX_SHRINK_ITERS: 10000
@@ -204,6 +309,7 @@ jobs:
         
         # Run with very high iteration counts for fuzzing
         cargo test --all-features -- property --nocapture
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test --nocapture
       timeout-minutes: 120
       env:
         PROPTEST_CASES: 100000
@@ -233,7 +339,7 @@ jobs:
   property-test-analysis:
     name: Property Test Analysis
     runs-on: ubuntu-latest
-    needs: [property-tests]
+    needs: [property-tests, cli-integration-tests]
     if: always()
     steps:
     - uses: actions/checkout@v4
@@ -247,7 +353,7 @@ jobs:
       run: |
         echo "# Property Test Analysis Report" > analysis-report.md
         echo "## Overview" >> analysis-report.md
-        echo "This report analyzes the results of property-based tests across all platforms." >> analysis-report.md
+        echo "This report analyzes the results of property-based tests and CLI integration tests across all platforms." >> analysis-report.md
         echo "" >> analysis-report.md
         
         echo "## Platform Results" >> analysis-report.md
@@ -261,8 +367,10 @@ jobs:
         
         echo "## Recommendations" >> analysis-report.md
         echo "- All property tests should pass consistently across platforms" >> analysis-report.md
+        echo "- CLI integration tests should pass on all supported platforms" >> analysis-report.md
         echo "- Any failures should be investigated and fixed" >> analysis-report.md
         echo "- Consider increasing test case counts for critical properties" >> analysis-report.md
+        echo "- CLI binary functionality should be validated on each platform" >> analysis-report.md
 
     - name: Upload Analysis Report
       uses: actions/upload-artifact@v3

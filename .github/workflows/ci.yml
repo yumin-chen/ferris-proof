@@ -72,9 +72,71 @@ jobs:
       run: cargo test --verbose --all-features --test '*'
       timeout-minutes: 15
 
+    - name: Build CLI binary
+      run: cargo build --verbose --all-features --bin ferris-proof
+      timeout-minutes: 5
+
+    - name: Run CLI unit tests
+      run: |
+        echo "Running CLI command unit tests..."
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_commands_unit_test --verbose -- --test-threads=1
+      timeout-minutes: 10
+
+    - name: Run CLI integration tests
+      run: |
+        echo "Running CLI integration tests..."
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml --test '*' --verbose -- --test-threads=1
+      timeout-minutes: 10
+
+    - name: Test CLI binary functionality
+      run: |
+        echo "Testing CLI binary functionality..."
+        # Test help command
+        ./target/debug/ferris-proof --help
+        
+        # Test version command
+        ./target/debug/ferris-proof --version
+        
+        # Test explain command with known error codes
+        ./target/debug/ferris-proof explain FP-CF-001
+        ./target/debug/ferris-proof explain FP-VR-001
+        ./target/debug/ferris-proof explain FP-TL-001
+        ./target/debug/ferris-proof explain FP-IO-001
+        
+        # Test config command (should fail gracefully without config)
+        ./target/debug/ferris-proof config || echo "Config command failed as expected without ferrisproof.toml"
+        
+        # Test init command in temporary directory
+        mkdir -p /tmp/ferris-test-$$
+        cd /tmp/ferris-test-$$
+        ../../../target/debug/ferris-proof init --level standard
+        
+        # Verify init created expected files and directories
+        test -f ferrisproof.toml
+        test -d specs
+        test -d tests
+        test -d tests/property
+        
+        # Test config command after init
+        ../../../target/debug/ferris-proof config
+        ../../../target/debug/ferris-proof config --validate
+        
+        # Clean up
+        cd - && rm -rf /tmp/ferris-test-$$
+      timeout-minutes: 5
+
     - name: Run property-based tests
       run: cargo test --verbose --all-features -- --ignored
       timeout-minutes: 20
+      env:
+        PROPTEST_CASES: 1000
+        PROPTEST_MAX_SHRINK_ITERS: 10000
+
+    - name: Run CLI property-based tests
+      run: |
+        echo "Running CLI initialization property tests..."
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test --verbose -- --test-threads=1
+      timeout-minutes: 15
       env:
         PROPTEST_CASES: 1000
         PROPTEST_MAX_SHRINK_ITERS: 10000
@@ -91,6 +153,9 @@ jobs:
         
         echo "Running property tests in ferris-proof-plugins..."
         cargo test --manifest-path ferris-proof-plugins/Cargo.toml network_isolation_tests --verbose
+        
+        echo "Running CLI property tests..."
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test --verbose -- --test-threads=1
       timeout-minutes: 25
       env:
         PROPTEST_CASES: 1000
@@ -161,6 +226,7 @@ jobs:
     - name: Generate code coverage (property tests)
       run: |
         cargo llvm-cov --all-features --workspace --lcov --output-path lcov-property.info -- property
+        cargo llvm-cov --all-features --manifest-path ferris-proof-cli/Cargo.toml --lcov --output-path lcov-cli-property.info cli_initialization_property_test
       env:
         PROPTEST_CASES: 100  # Reduced for coverage to avoid timeout
 
@@ -168,7 +234,7 @@ jobs:
       run: |
         # Install lcov for merging
         sudo apt-get install -y lcov
-        lcov --add-tracefile lcov-unit.info --add-tracefile lcov-integration.info --add-tracefile lcov-property.info --output-file lcov.info
+        lcov --add-tracefile lcov-unit.info --add-tracefile lcov-integration.info --add-tracefile lcov-property.info --add-tracefile lcov-cli-property.info --output-file lcov.info
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -224,6 +290,7 @@ jobs:
       run: |
         cargo test --verbose --all-features -- property
         cargo test --verbose --all-features -- proptest
+        cargo test --manifest-path ferris-proof-cli/Cargo.toml cli_initialization_property_test --verbose
       timeout-minutes: 30
       env:
         PROPTEST_CASES: 500
@@ -322,6 +389,22 @@ jobs:
 
     - name: Build release binary
       run: cargo build --release --target ${{ matrix.target }} --bin ferris-proof
+
+    - name: Test release binary
+      if: matrix.os != 'windows-latest'
+      run: |
+        echo "Testing release binary functionality..."
+        ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }} --help
+        ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }} --version
+        ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }} explain FP-CF-001
+
+    - name: Test release binary (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        echo "Testing release binary functionality..."
+        ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }} --help
+        ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }} --version
+        ./target/${{ matrix.target }}/release/${{ matrix.artifact_name }} explain FP-CF-001
 
     - name: Strip binary (Unix)
       if: matrix.os != 'windows-latest'
