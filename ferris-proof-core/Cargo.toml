@@ -25,6 +25,11 @@ regex.workspace = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
+semver.workspace = true
+hex.workspace = true
+bincode.workspace = true
+zstd.workspace = true
+dirs.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
