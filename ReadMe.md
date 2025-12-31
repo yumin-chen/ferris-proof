@@ -26,53 +26,6 @@ Multi-layer correctness pipeline for Rust applications that combines formal mode
 - **Comprehensive Caching**: Content-addressed verification result caching
 - **Security-First**: Sandboxed execution and local-only verification options
 
-## Quick Start
-
-### Installation
-
-```bash
-# Install from source (crates.io release coming soon)
-git clone https://github.com/yumin-chen/ferris-proof.git
-cd ferris-proof
-cargo install --path ferris-proof-cli
-```
-
-### Initialise a Project
-
-```bash
-# Initialise with standard verification level
-ferris-proof init --level standard
-
-# Interactive setup
-ferris-proof init --interactive
-```
-
-### Run Verification
-
-```bash
-# Check all verification requirements
-ferris-proof check
-
-# Check specific module
-ferris-proof check --module consensus
-
-# Auto-fix violations where possible
-ferris-proof check --fix
-```
-
----
-
-## Verification Levels
-
-FerrisProof supports four configurable verification levels:
-
-| Level | Techniques | Use Case |
-|-------|------------|----------|
-| **Minimal** | Type safety only | Getting started, legacy code |
-| **Standard** | + Property-based testing | Most production applications |
-| **Strict** | + Session types, refinement types, concurrency testing | Mission-critical systems |
-| **Formal** | + Formal specifications (TLA+/Alloy) | Distributed systems, protocols |
-
 ---
 
 ## Architecture Overview
@@ -249,15 +202,23 @@ ferris-proof/
 ├── ferris-proof-core/            # Core verification engine
 ├── ferris-proof-config/          # Configuration management
 ├── ferris-proof-plugins/         # Plugin system and tool integrations
+├── scripts/                      # CI/CD and development scripts
+│   ├── ci-local.sh              # Local CI pipeline
+│   ├── ci-setup.sh              # Development environment setup
+│   └── container-build.sh       # Container build script
 ├── docs/                         # Documentation
 │   ├── ferris-proof.tsd.specs.md # Detailed architecture design
-│   └── ferris-proof.prd.specs.md # Functional requirements
+│   ├── ferris-proof.prd.specs.md # Functional requirements
+│   └── ci-pipeline.md           # CI/CD documentation
 ├── Cargo.toml                    # Workspace configuration
+├── Containerfile                 # Standard container build
+├── Containerfile.alpine          # Minimal Alpine container build
+├── Makefile                      # Common development tasks
+├── .gitlab-ci.yml               # GitLab CI/CD pipeline
+├── .github/                      # GitHub Actions workflows
 ├── ReadMe.md                     # This file
 ├── Contributing.md               # Contribution guidelines
-├── Licence.md                       # CC0 1.0 Universal licence
-└── Dockerfile                    # Container build
-├── .github/                      # GitHub Actions workflows
+└── Licence.md                    # CC0 1.0 Universal licence
 ```
 
 ---
@@ -473,6 +434,7 @@ sequenceDiagram
 ## Documentation
 
 - [Getting Started Guide](docs/getting-started.md)
+- [CI Pipeline](docs/ci-pipeline.md)
 - [Configuration Reference](docs/configuration.md)
 - [Verification Levels](docs/verification-levels.md)
 - [Tool Integration](docs/tool-integration.md)

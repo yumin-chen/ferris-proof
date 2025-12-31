@@ -1,0 +1,96 @@
+# Multi-stage Alpine-based Containerfile optimized for Podman
+# Produces a minimal container image for FerrisProof (~15-20MB)
+
+# Build stage
+FROM docker.io/library/rust:1.75-alpine3.19 AS builder
+
+# Install build dependencies with version pinning for reproducibility
+RUN apk add --no-cache \
+    musl-dev=1.2.4_git20230717-r4 \
+    pkgconfig=2.0.3-r0 \
+    openssl-dev=3.1.4-r5 \
+    openssl-libs-static=3.1.4-r5 \
+    git=2.42.1-r0 \
+    ca-certificates=20240226-r0
+
+# Set environment for static linking and reproducible builds
+ENV RUSTFLAGS="-C target-feature=-crt-static -C link-arg=-s" \
+    PKG_CONFIG_ALL_STATIC=1 \
+    PKG_CONFIG_ALL_DYNAMIC=0 \
+    CARGO_NET_RETRY=3 \
+    CARGO_NET_TIMEOUT=30
+
+# Create app directory
+WORKDIR /app
+
+# Copy manifests first for better layer caching
+COPY Cargo.toml Cargo.lock ./
+COPY ferris-proof-cli/Cargo.toml ./ferris-proof-cli/
+COPY ferris-proof-core/Cargo.toml ./ferris-proof-core/
+COPY ferris-proof-config/Cargo.toml ./ferris-proof-config/
+COPY ferris-proof-plugins/Cargo.toml ./ferris-proof-plugins/
+
+# Create dummy source files to cache dependencies
+RUN mkdir -p ferris-proof-cli/src ferris-proof-core/src ferris-proof-config/src ferris-proof-plugins/src && \
+    echo "fn main() {}" > ferris-proof-cli/src/main.rs && \
+    echo "// dummy" > ferris-proof-cli/src/lib.rs && \
+    echo "// dummy" > ferris-proof-core/src/lib.rs && \
+    echo "// dummy" > ferris-proof-config/src/lib.rs && \
+    echo "// dummy" > ferris-proof-plugins/src/lib.rs
+
+# Build dependencies (this layer will be cached)
+RUN cargo build --release && \
+    rm -rf src target/release/deps/ferris_proof*
+
+# Copy actual source code
+COPY . .
+
+# Build the application
+RUN cargo build --release --bin ferris-proof && \
+    strip target/release/ferris-proof
+
+# Runtime stage - minimal Alpine image with security hardening
+FROM docker.io/library/alpine:3.19
+
+# Install minimal runtime dependencies and security updates
+RUN apk add --no-cache \
+    ca-certificates=20240226-r0 \
+    tzdata=2024a-r0 \
+    && apk upgrade --no-cache \
+    && rm -rf /var/cache/apk/* \
+    # Create non-root user with specific UID/GID for Podman compatibility
+    && addgroup -g 1001 ferrisproof \
+    && adduser -D -s /bin/sh -u 1001 -G ferrisproof ferrisproof
+
+# Copy binary from builder stage
+COPY --from=builder /app/target/release/ferris-proof /usr/local/bin/ferris-proof
+
+# Create workspace directory with proper ownership and permissions
+RUN mkdir -p /workspace && \
+    chown ferrisproof:ferrisproof /workspace && \
+    chmod 755 /workspace && \
+    chmod +x /usr/local/bin/ferris-proof
+
+# Switch to non-root user
+USER ferrisproof
+
+# Set working directory
+WORKDIR /workspace
+
+# Health check for container monitoring
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD ferris-proof --version || exit 1
+
+# Enhanced OCI labels for better container management
+LABEL org.opencontainers.image.title="FerrisProof" \
+      org.opencontainers.image.description="Multi-layer correctness pipeline for Rust applications" \
+      org.opencontainers.image.vendor="FerrisProof Contributors" \
+      org.opencontainers.image.licenses="CC0-1.0" \
+      org.opencontainers.image.source="https://github.com/ferris-proof/ferris-proof" \
+      org.opencontainers.image.documentation="https://github.com/ferris-proof/ferris-proof/blob/main/README.md" \
+      org.opencontainers.image.base.name="docker.io/library/alpine:3.19" \
+      org.opencontainers.image.authors="FerrisProof Contributors"
+
+# Default command
+ENTRYPOINT ["ferris-proof"]
+CMD ["--help"]

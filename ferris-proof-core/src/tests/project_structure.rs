@@ -25,7 +25,7 @@ mod project_structure_tests {
             let mut root_files = HashSet::new();
             root_files.insert("Cargo.toml".to_string());
             root_files.insert("ReadMe.md".to_string());
-            root_files.insert("Dockerfile".to_string());
+            root_files.insert("Containerfile".to_string());
 
             let mut required_directories = HashSet::new();
             required_directories.insert("ferris-proof-cli".to_string());
